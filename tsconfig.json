@@ -2,9 +2,14 @@
   "compilerOptions": {
     "target": "ESNext",
     "lib": ["ESNext"],
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "resolveJsonModule": true,
+    "types": ["vitest/globals"],
     "strict": true,
     "strictNullChecks": true,
     "noEmit": true,

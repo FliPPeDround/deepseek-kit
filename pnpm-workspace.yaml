@@ -1,14 +1,13 @@
 catalogMode: prefer
+
 ignoreWorkspaceRootCheck: true
 shellEmulator: true
 trustPolicy: no-downgrade
-
 packages:
   - playground
   - docs
   - packages/*
   - examples/*
-
 catalogs:
   cli:
     '@antfu/eslint-config': ^8.2.0
@@ -18,12 +17,17 @@ catalogs:
     lint-staged: ^16.4.0
     publint: ^0.3.18
     simple-git-hooks: ^2.13.1
-    tsdown: ^0.21.10
+    tsdown: ^0.22.0
     tsx: ^4.21.0
     typescript: ^6.0.3
     vite: ^8.0.9
+  env:
+    dotenv: ^17.4.2
   inlined:
     '@antfu/utils': ^9.3.0
+    es-toolkit: ^1.46.1
+  schema:
+    zod: ^4.4.3
   testing:
     tsdown-stale-guard: ^0.1.1
     tsnapi: ^0.3.2

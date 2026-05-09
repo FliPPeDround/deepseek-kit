@@ -1,0 +1,17 @@
+{
+  "name": "@example/generate-text",
+  "type": "module",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.33.1",
+  "description": "Generate text using the DeepSeek Agents",
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.ts"
+  },
+  "dependencies": {
+    "deepseek-agents": "workspace:*"
+  }
+}

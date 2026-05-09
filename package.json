@@ -34,12 +34,17 @@
     "typecheck": "tsc",
     "prepare": "simple-git-hooks"
   },
+  "dependencies": {
+    "dotenv": "catalog:env",
+    "zod": "catalog:schema"
+  },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:cli",
     "@antfu/ni": "catalog:cli",
     "@antfu/utils": "catalog:inlined",
     "@types/node": "catalog:types",
     "bumpp": "catalog:cli",
+    "es-toolkit": "catalog:inlined",
     "eslint": "catalog:cli",
     "lint-staged": "catalog:cli",
     "publint": "catalog:cli",
@@ -57,5 +62,8 @@
   },
   "lint-staged": {
     "*": "eslint --fix"
+  },
+  "inlinedDependencies": {
+    "es-toolkit": "1.46.1"
   }
 }
