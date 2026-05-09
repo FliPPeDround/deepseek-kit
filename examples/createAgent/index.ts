@@ -1,0 +1,62 @@
+/* eslint-disable no-console */
+import { createAgent, createModel, tool } from 'deepseek-agents'
+import { z } from 'zod'
+
+const model = createModel({
+  model: 'deepseek-v4-flash',
+  thinking: {
+    type: 'disabled',
+  },
+})
+const weatherTool = tool({
+  name: 'weather',
+  description: 'useful when you want to know the weather',
+  schema: z.object({
+    city: z.string().describe('the city you want to know the weather of'),
+  }),
+  execute: async (input) => {
+    if (input.city === '重庆') {
+      return `重庆今天天气晴朗`
+    }
+    if (input.city === '北京') {
+      return `北京今天在下大雨`
+    }
+    return `${input.city}今天天气晴朗`
+  },
+})
+
+const agent = createAgent({
+  model,
+  tools: [weatherTool],
+  output: {
+    schema: z.object({
+      city: z.string(),
+      weather: z.string(),
+    }),
+  },
+  onStep: (step) => {
+    console.log(step)
+  },
+})
+
+const res = await agent.generateText({
+  messages: [
+    {
+      role: 'user',
+      content: '北京天气天气怎么样',
+    },
+  ],
+})
+
+console.log(res)
+
+const { output } = await agent.generateText({
+  messages: [
+    {
+      role: 'user',
+      content: '重庆天气天气怎么样',
+    },
+  ],
+})
+
+console.log(output)

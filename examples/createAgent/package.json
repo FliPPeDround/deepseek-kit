@@ -1,0 +1,17 @@
+{
+  "name": "@example/create-agent",
+  "type": "module",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.33.1",
+  "description": "Create an agent using the DeepSeek Agents",
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.ts"
+  },
+  "dependencies": {
+    "deepseek-agents": "workspace:*"
+  }
+}
