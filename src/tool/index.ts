@@ -9,7 +9,7 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
     const parsed = schema.safeParse(JSON.parse(args))
     if (!parsed.success) {
       const message = parsed.error.issues.map(issue => issue.message).join(', ')
-      throw new Error(message)
+      return `Tool execution error: ${message}`
     }
     try {
       const result = await execute(parsed.data)
