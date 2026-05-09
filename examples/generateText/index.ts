@@ -8,17 +8,18 @@ const model = createModel({
     type: 'disabled',
   },
 })
-const weatherSchema = z.object({ city: z.string() })
 const weatherTool = tool({
   name: 'weather',
   description: 'useful when you want to know the weather',
-  schema: weatherSchema,
+  schema: z.object({
+    city: z.string().describe('the city you want to know the weather of'),
+  }),
   execute: async (input) => {
     return `${input.city}今天天气晴朗`
   },
 })
 
-const text = await generateText({
+const { output } = await generateText({
   model,
   tools: [weatherTool],
   messages: [
@@ -27,7 +28,7 @@ const text = await generateText({
       content: '北京天气天气怎么样',
     },
   ],
-  responseFormat: {
+  output: {
     schema: z.object({
       city: z.string(),
       weather: z.string(),
@@ -38,4 +39,4 @@ const text = await generateText({
   },
 })
 
-console.log(text)
+console.log(output)

@@ -1,23 +1,42 @@
+import type { StepEvent } from './types'
 import type { ChatMessage, DeepSeekModel } from '@/model/types'
 import { z } from 'zod'
 import { formatZodErrors } from './error-formatter'
 
-export interface StructuredOutputParams {
+export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
   conversationMessages: ChatMessage[]
-  schema: z.ZodTypeAny
+  schema: T
+  step?: number
   maxRetries?: number
+  onStep?: (step: StepEvent) => void
+}
+
+function buildFormatOutputPrompt(schema: z.ZodTypeAny) {
+  const stringSchema = JSON.stringify(z.toJSONSchema(schema), null, 2)
+  return `
+你必须基于以上对话历史，输出一个符合以下JSON Schema的JSON对象。只输出JSON，不要有任何解释。
+JSON Schema:
+\`\`\`
+${stringSchema}
+\`\`\``
 }
 
 export async function generateStructuredOutput<T extends z.ZodTypeAny>(
-  params: StructuredOutputParams,
+  params: StructuredOutputParams<T>,
 ): Promise<z.infer<T>> {
-  const { model, conversationMessages, schema, maxRetries = 3 } = params
+  const {
+    model,
+    conversationMessages,
+    schema,
+    maxRetries = 3,
+    step = 0,
+    onStep,
+  } = params
 
-  const jsonSchema = z.toJSONSchema(schema)
-  const initialFormatPrompt = `你必须基于以上对话历史，输出一个符合以下JSON Schema的JSON对象。只输出JSON，不要有任何解释。\n\nJSON Schema:\n\`\`\`\n${jsonSchema}\n\`\`\``
+  const initialFormatPrompt = buildFormatOutputPrompt(schema)
 
-  const currentMessages = [
+  const currentMessages: ChatMessage[] = [
     ...conversationMessages,
     { role: 'user', content: initialFormatPrompt },
   ]
@@ -27,14 +46,22 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // 2. 调用模型，强制 JSON 模式
     const response = await model.invoke({
-      messages: currentMessages as ChatMessage[],
+      messages: currentMessages,
       response_format: { type: 'json_object' },
       tools: undefined,
     })
 
-    lastResponseText = response.choices[0].message.content || ''
+    const choice = response.choices[0]
+    const message = choice.message
+    lastResponseText = message.content || ''
 
     try {
+      onStep?.({
+        step: step + attempt,
+        type: 'format',
+        text: lastResponseText,
+        reasoningContent: message.reasoning_content,
+      })
       const parsed = JSON.parse(lastResponseText)
       const result = schema.safeParse(parsed)
 

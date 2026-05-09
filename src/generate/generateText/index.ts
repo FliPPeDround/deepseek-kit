@@ -1,3 +1,4 @@
+import type z from 'zod'
 import type { GenerateTextParams } from '../types'
 import type { ChatCompletionChoice, ChatMessage } from '@/model/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
@@ -13,11 +14,18 @@ function needCallTool(choices: ChatCompletionChoice) {
   return false
 }
 
-export async function generateText(params: GenerateTextParams) {
-  const { model, tools, messages, maxSteps = AGENT_LOOP_MAX_STEPS, onStep, responseFormat } = params
+export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>) {
+  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, onStep, output } = params
 
-  const currentMessages = messages
+  const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
   let step = 0
+  const result: {
+    text?: string
+    output?: z.infer<T>
+  } = {
+    text: undefined,
+    output: undefined,
+  }
   while (step < maxSteps) {
     step++
 
@@ -44,22 +52,41 @@ export async function generateText(params: GenerateTextParams) {
         }
       }
 
-      onStep?.({ step, toolCalls: message.tool_calls })
+      onStep?.({
+        step,
+        type: 'tool',
+        toolCalls: message.tool_calls,
+        text: message.content,
+        reasoningContent: message.reasoning_content,
+      })
       continue
     }
 
-    onStep?.({ step, text: message.content || '' })
-
-    if (responseFormat) {
+    if (output) {
       const structuredData = await generateStructuredOutput({
         model,
         conversationMessages: currentMessages,
-        schema: responseFormat.schema,
+        schema: output.schema,
+        onStep,
+        step,
       })
-      return JSON.stringify(structuredData)
+      result.output = structuredData
+      break
     }
 
-    return message.content
+    onStep?.({
+      step,
+      type: 'text',
+      text: message.content || '',
+      reasoningContent: message.reasoning_content || '',
+    })
+
+    result.text = message.content
+    break
+  }
+
+  if (result.output || result.text) {
+    return result
   }
 
   throw new Error(`Max steps (${maxSteps}) reached without getting a final response`)
