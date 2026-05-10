@@ -6,7 +6,7 @@ describe('createModel', () => {
     const model = createModel({
       model: 'deepseek-v4-flash',
     })
-    const response = await model.invoke([{ role: 'user', content: '你好' }])
+    const response = await model.invoke({ messages: [{ role: 'user', content: 'Hello' }] })
     expect(response.choices[0].message).toBeDefined()
   })
 })

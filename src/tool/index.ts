@@ -29,17 +29,17 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
 
 export type Tool = ReturnType<typeof tool>
 
-export function buildToolsParams(tools: Tool[]) {
+export function buildToolParameters(tools: Tool[]) {
   if (tools.length === 0) {
     return {
-      toolParams: undefined,
+      toolParameters: undefined,
       toolChoice: undefined,
     }
   }
-  const toolParams: ToolCall[] = []
+  const toolParameters: ToolCall[] = []
   const toolChoice: ToolChoice[] = []
   for (const tool of tools) {
-    toolParams.push({
+    toolParameters.push({
       type: 'function',
       function: {
         name: tool.name,
@@ -58,7 +58,7 @@ export function buildToolsParams(tools: Tool[]) {
     }
   }
   return {
-    toolParams: toolParams.length > 0 ? toolParams : undefined,
+    toolParameters: toolParameters.length > 0 ? toolParameters : undefined,
     toolChoice: toolChoice.length > 0 ? toolChoice : undefined,
   }
 }

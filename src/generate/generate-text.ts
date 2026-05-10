@@ -1,10 +1,10 @@
 import type z from 'zod'
-import type { GenerateTextParams } from '../types'
+import type { GenerateTextParams } from './types'
 import type { ChatCompletionChoice, ChatMessage } from '@/model/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
-import { generateStructuredOutput } from '../generate-structured-output'
+import { generateStructuredOutput } from './generate-structured-output'
 
-function needCallTool(choices: ChatCompletionChoice) {
+function needsToolCall(choices: ChatCompletionChoice) {
   if (choices.finish_reason === 'tool_calls') {
     return true
   }
@@ -37,7 +37,7 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
     const choice = response.choices[0]
     const message = choice.message
     currentMessages.push(message as unknown as ChatMessage)
-    if (needCallTool(choice) && tools) {
+    if (needsToolCall(choice) && tools) {
       for (const toolCall of message.tool_calls) {
         const name = toolCall.function?.name
         const tool = tools.find(tool => tool.name === name)

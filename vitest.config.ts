@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// 加载 .env 文件
+// Load .env file
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 export default defineConfig({

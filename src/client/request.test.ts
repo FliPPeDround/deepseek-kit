@@ -1,11 +1,11 @@
 import { DEEPSEEK_API_BASE_URL } from '@/constants'
-import { chatEndpoint } from './endpoints'
-import { request } from './request'
+import { getChatEndpoint } from './endpoints'
+import { apiRequest } from './request'
 
-describe('request', () => {
+describe('apiRequest', () => {
   it('should return a response', async () => {
-    const url = chatEndpoint(DEEPSEEK_API_BASE_URL)
-    const response = await request(
+    const url = getChatEndpoint(DEEPSEEK_API_BASE_URL)
+    const response = await apiRequest(
       url,
       'sk-1234567890abcdef1234567890abcdef',
       {

@@ -1,4 +1,4 @@
-export async function request<T>(
+export async function apiRequest<T>(
   url: string,
   apiKey: string,
   options: Record<string, any>,
