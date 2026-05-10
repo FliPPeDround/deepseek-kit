@@ -171,9 +171,39 @@ export interface ChatCompletion {
   usage: Usage
 }
 
+export interface ChatCompletionChunkDelta {
+  role?: 'assistant'
+  content?: string
+  reasoning_content?: string
+  tool_calls?: {
+    index: number
+    id?: string
+    type?: 'function'
+    function?: {
+      name?: string
+      arguments?: string
+    }
+  }[]
+}
+
+export interface ChatCompletionChunkChoice {
+  index: number
+  delta: ChatCompletionChunkDelta
+  finish_reason: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'insufficient_system_resource' | null
+}
+
+export interface ChatCompletionChunk {
+  id: string
+  object: 'chat.completion.chunk'
+  created: number
+  model: Model
+  choices: ChatCompletionChunkChoice[]
+}
+
 export interface DeepSeekModel {
   config: ModelOptions
   invoke: (params: InvokeParams) => Promise<ChatCompletion>
+  invokeStream: (params: InvokeParams) => AsyncGenerator<ChatCompletionChunk>
 }
 
 export interface InvokeParams {

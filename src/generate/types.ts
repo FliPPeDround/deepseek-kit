@@ -22,3 +22,47 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
     schema: T
   }
 }
+
+export interface TextDeltaStreamEvent {
+  type: 'text-delta'
+  textDelta: string
+}
+
+export interface ReasoningDeltaStreamEvent {
+  type: 'reasoning-delta'
+  reasoningDelta: string
+}
+
+export interface ToolCallStreamEvent {
+  type: 'tool-call'
+  step: number
+  toolCalls: ChatCompletionTool[]
+}
+
+export interface StepStreamEvent {
+  type: 'step'
+  step: number
+}
+
+export interface FinishStreamEvent {
+  type: 'finish'
+  text?: string
+}
+
+export type StreamEvent
+  = | TextDeltaStreamEvent
+    | ReasoningDeltaStreamEvent
+    | ToolCallStreamEvent
+    | StepStreamEvent
+    | FinishStreamEvent
+
+export interface GenerateStreamParams<T extends z.ZodTypeAny> {
+  model: DeepSeekModel
+  tools?: Tool[]
+  system?: string
+  messages: ChatMessage[]
+  maxSteps?: number
+  output?: {
+    schema: T
+  }
+}

@@ -2,7 +2,7 @@ import type { DeepSeekModel, InvokeParams, ModelOptions } from './types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
 import { DEEPSEEK_API_BASE_URL, DEEPSEEK_MODELS } from '@/constants'
-import { invoke } from './invoke'
+import { invoke, invokeStream } from './invoke'
 import 'dotenv/config'
 
 export function createModel(options: ModelOptions): DeepSeekModel {
@@ -30,6 +30,9 @@ export function createModel(options: ModelOptions): DeepSeekModel {
     config,
     invoke(params: InvokeParams) {
       return invoke(config, params)
+    },
+    invokeStream(params: InvokeParams) {
+      return invokeStream(config, params)
     },
   }
 }
