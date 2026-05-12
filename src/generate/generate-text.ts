@@ -14,18 +14,13 @@ function needsToolCall(choices: ChatCompletionChoice) {
   return false
 }
 
+export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T> & { output: { schema: T } }): Promise<z.infer<T>>
+export async function generateText(params: Omit<GenerateTextParams<z.ZodTypeAny>, 'output'>): Promise<string>
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>) {
   const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, onStep, output } = params
 
   const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
   let step = 0
-  const result: {
-    text?: string
-    output?: z.infer<T>
-  } = {
-    text: undefined,
-    output: undefined,
-  }
   while (step < maxSteps) {
     step++
 
@@ -70,8 +65,7 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
         onStep,
         step,
       })
-      result.output = structuredData
-      break
+      return structuredData
     }
 
     onStep?.({
@@ -81,12 +75,7 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
       reasoningContent: message.reasoning_content || '',
     })
 
-    result.text = message.content
-    break
-  }
-
-  if (result.output || result.text) {
-    return result
+    return message.content || ''
   }
 
   throw new Error(`Max steps (${maxSteps}) reached without getting a final response`)

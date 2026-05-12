@@ -50,7 +50,7 @@ const res = await agent.generateText({
 
 console.log(res)
 
-const { output } = await agent.generateText({
+const output = await agent.generateText({
   messages: [
     {
       role: 'user',

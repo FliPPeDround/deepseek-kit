@@ -19,7 +19,7 @@ const weatherTool = tool({
   },
 })
 
-const { output } = await generateText({
+const output = await generateText({
   model,
   tools: [weatherTool],
   messages: [
