@@ -18,6 +18,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   system?: string
   messages: ChatMessage[]
   maxSteps?: number
+  prompt?: string
   output?: {
     schema: T
   }

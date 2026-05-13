@@ -23,12 +23,30 @@ function mergeUsage(target: Usage, source: Usage): void {
   target.completion_tokens_details.reasoning_tokens += source.completion_tokens_details?.reasoning_tokens ?? 0
 }
 
+function buildMessage(prompt?: string, system?: string, messages?: ChatMessage[]): ChatMessage[] {
+  if (!prompt && !system && !messages) {
+    throw new Error('prompt is required')
+  }
+  const message: ChatMessage[] = []
+  if (system) {
+    message.push({ role: 'system', content: system })
+  }
+  if (messages) {
+    message.push(...messages)
+  }
+  if (prompt) {
+    message.push({ role: 'user', content: prompt })
+  }
+  return message
+}
+
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T> & { output: { schema: T } }): Promise<GenerateOutputResult<T>>
 export async function generateText(params: Omit<GenerateTextParams<z.ZodTypeAny>, 'output'>): Promise<GenerateTextResult>
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>) {
-  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, onStep, output } = params
+  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, onStep, output } = params
+  const chatMessage = buildMessage(prompt, system, messages)
 
-  const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
+  const currentMessages: ChatMessage[] = chatMessage
   const totalUsage: Usage = {
     completion_tokens: 0,
     prompt_tokens: 0,
