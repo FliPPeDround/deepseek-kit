@@ -10,7 +10,6 @@ export interface ToolDefinition<T extends z.ZodObject> {
 }
 
 export interface ToolCall {
-  id?: string
   type: 'function'
   function: {
     name: string
@@ -20,7 +19,7 @@ export interface ToolCall {
   }
 }
 
-export interface ToolChoice {
+export type ToolChoice = 'auto' | 'none' | 'required' | {
   type: 'function'
   function: {
     name: string

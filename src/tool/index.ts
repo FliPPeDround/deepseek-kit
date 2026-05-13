@@ -5,6 +5,10 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   const { schema, execute } = config
   const jsonSchema = z.toJSONSchema(schema)
 
+  if (config.strict) {
+    enforceStrictSchema(jsonSchema)
+  }
+
   const wrappedExecute = async (args: string) => {
     const parsed = schema.safeParse(JSON.parse(args))
     if (!parsed.success) {
@@ -27,6 +31,25 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   }
 }
 
+function enforceStrictSchema(schema: Record<string, any>): void {
+  if (schema.type === 'object') {
+    schema.additionalProperties = false
+    if (!schema.required && schema.properties) {
+      schema.required = Object.keys(schema.properties)
+    }
+  }
+  if (schema.properties) {
+    for (const prop of Object.values(schema.properties)) {
+      if (typeof prop === 'object' && prop !== null) {
+        enforceStrictSchema(prop)
+      }
+    }
+  }
+  if (schema.items && typeof schema.items === 'object') {
+    enforceStrictSchema(schema.items)
+  }
+}
+
 export type Tool = ReturnType<typeof tool>
 
 export function buildToolParameters(tools: Tool[]) {
@@ -37,28 +60,33 @@ export function buildToolParameters(tools: Tool[]) {
     }
   }
   const toolParameters: ToolCall[] = []
-  const toolChoice: ToolChoice[] = []
-  for (const tool of tools) {
+  let toolChoice: ToolChoice | undefined
+  const requiredTools: string[] = []
+  for (const t of tools) {
     toolParameters.push({
       type: 'function',
       function: {
-        name: tool.name,
-        description: tool.description,
-        strict: tool.strict || false,
-        parameters: tool.parameters,
+        name: t.name,
+        description: t.description,
+        strict: t.strict || false,
+        parameters: t.parameters,
       },
     })
-    if (tool.required) {
-      toolChoice.push({
-        type: 'function',
-        function: {
-          name: tool.name,
-        },
-      })
+    if (t.required) {
+      requiredTools.push(t.name)
     }
+  }
+  if (requiredTools.length === 1) {
+    toolChoice = {
+      type: 'function',
+      function: { name: requiredTools[0] },
+    }
+  }
+  else if (requiredTools.length > 1) {
+    toolChoice = 'required'
   }
   return {
     toolParameters: toolParameters.length > 0 ? toolParameters : undefined,
-    toolChoice: toolChoice.length > 0 ? toolChoice : undefined,
+    toolChoice,
   }
 }

@@ -1,6 +1,6 @@
 import type z from 'zod'
 import type { GenerateStreamParams, StreamEvent } from './types'
-import type { ChatCompletionChunkDelta, ChatMessage } from '@/model/types'
+import type { ChatCompletionChunkDelta, ChatMessage, Usage } from '@/model/types'
 import type { ChatCompletionTool } from '@/tool/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
 import { generateStructuredOutput } from './generate-structured-output'
@@ -41,84 +41,99 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
 
   const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
   let step = 0
+  let totalUsage: Usage | undefined
 
-  while (step < maxSteps) {
-    step++
+  const prevStreamOptions = model.config.streamOptions
+  model.config.streamOptions = { ...prevStreamOptions, include_usage: true }
 
-    const stream = model.invokeStream({
-      messages: currentMessages,
-      tools,
-    })
+  try {
+    while (step < maxSteps) {
+      step++
+      yield { type: 'step', step }
 
-    let text = ''
-    let toolCallsAccumulated: ChatCompletionTool[] = []
-    let finishReason: string | null = null
+      const stream = model.invokeStream({
+        messages: currentMessages,
+        tools,
+      })
 
-    for await (const chunk of stream) {
-      const choice = chunk.choices[0]
-      if (!choice) {
-        continue
-      }
+      let text = ''
+      let toolCallsAccumulated: ChatCompletionTool[] = []
+      let finishReason: string | null = null
 
-      const delta = choice.delta
+      for await (const chunk of stream) {
+        if (chunk.usage) {
+          totalUsage = chunk.usage
+        }
 
-      if (delta.content) {
-        text += delta.content
-        yield { type: 'text-delta', textDelta: delta.content }
-      }
+        const choice = chunk.choices[0]
+        if (!choice) {
+          continue
+        }
 
-      if (delta.reasoning_content) {
-        yield { type: 'reasoning-delta', reasoningDelta: delta.reasoning_content }
-      }
+        const delta = choice.delta
 
-      if (delta.tool_calls) {
-        toolCallsAccumulated = accumulateToolCalls(toolCallsAccumulated, delta.tool_calls)
-      }
+        if (delta.content) {
+          text += delta.content
+          yield { type: 'text-delta', textDelta: delta.content }
+        }
 
-      if (choice.finish_reason) {
-        finishReason = choice.finish_reason
-      }
-    }
+        if (delta.reasoning_content) {
+          yield { type: 'reasoning-delta', reasoningDelta: delta.reasoning_content }
+        }
 
-    if (finishReason === 'tool_calls' && tools && toolCallsAccumulated.length > 0) {
-      currentMessages.push({
-        role: 'assistant',
-        content: text,
-        tool_calls: toolCallsAccumulated,
-      } as unknown as ChatMessage)
+        if (delta.tool_calls) {
+          toolCallsAccumulated = accumulateToolCalls(toolCallsAccumulated, delta.tool_calls)
+        }
 
-      for (const toolCall of toolCallsAccumulated) {
-        const name = toolCall.function?.name
-        const tool = tools.find(t => t.name === name)
-        if (tool) {
-          const args = toolCall.function.arguments
-          const result = await tool.execute(args)
-          currentMessages.push({
-            role: 'tool',
-            content: result,
-            tool_call_id: toolCall.id,
-          })
+        if (choice.finish_reason) {
+          finishReason = choice.finish_reason
         }
       }
 
-      yield { type: 'tool-call', step, toolCalls: toolCallsAccumulated }
-      continue
-    }
+      if ((finishReason === 'tool_calls' || toolCallsAccumulated.length > 0) && tools && toolCallsAccumulated.length > 0) {
+        currentMessages.push({
+          role: 'assistant',
+          content: text || null,
+          tool_calls: toolCallsAccumulated,
+        } as unknown as ChatMessage)
 
-    if (output) {
-      await generateStructuredOutput({
-        model,
-        conversationMessages: currentMessages,
-        schema: output.schema,
-        step,
-      })
-      yield { type: 'finish', text }
+        for (const toolCall of toolCallsAccumulated) {
+          const name = toolCall.function?.name
+          const tool = tools.find(t => t.name === name)
+          if (tool) {
+            const args = toolCall.function.arguments
+            const result = await tool.execute(args)
+            currentMessages.push({
+              role: 'tool',
+              content: result,
+              tool_call_id: toolCall.id,
+            })
+          }
+        }
+
+        yield { type: 'tool-call', step, toolCalls: toolCallsAccumulated }
+        continue
+      }
+
+      if (output) {
+        const structuredData = await generateStructuredOutput({
+          model,
+          conversationMessages: currentMessages,
+          schema: output.schema,
+          step,
+          tools,
+        })
+        yield { type: 'finish', text: JSON.stringify(structuredData), usage: totalUsage ?? undefined }
+        return
+      }
+
+      yield { type: 'finish', text, usage: totalUsage ?? undefined }
       return
     }
 
-    yield { type: 'finish', text }
-    return
+    throw new Error(`Max steps (${maxSteps}) reached without getting a final response`)
   }
-
-  throw new Error(`Max steps (${maxSteps}) reached without getting a final response`)
+  finally {
+    model.config.streamOptions = prevStreamOptions
+  }
 }

@@ -39,7 +39,7 @@ const agent = createAgent({
   },
 })
 
-const res = await agent.generateText({
+const res = await agent.generate({
   messages: [
     {
       role: 'user',
@@ -48,9 +48,9 @@ const res = await agent.generateText({
   ],
 })
 
-console.log(res)
+console.log(res, res.text, res.usage)
 
-const output = await agent.generateText({
+const output = await agent.generate({
   messages: [
     {
       role: 'user',
@@ -59,4 +59,4 @@ const output = await agent.generateText({
   ],
 })
 
-console.log(output)
+console.log(output, output.text, output.usage)

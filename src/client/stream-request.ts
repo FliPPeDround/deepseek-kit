@@ -4,6 +4,7 @@ export async function* apiStreamRequest(
   url: string,
   apiKey: string,
   options: Record<string, any>,
+  timeout?: number,
 ): AsyncGenerator<ChatCompletionChunk> {
   const headers = {
     'Content-Type': 'application/json',
@@ -14,14 +15,25 @@ export async function* apiStreamRequest(
     method: 'POST',
     headers,
     body: JSON.stringify({ ...options, stream: true }),
+    signal: timeout ? AbortSignal.timeout(timeout) : undefined,
   })
   if (!response.ok) {
-    const { error } = (await response.json()) as { error: { message: string } }
-    const errorMessage = error?.message || response.statusText
+    let errorMessage = response.statusText
+    try {
+      const body = await response.json() as { error?: { message?: string } }
+      errorMessage = body?.error?.message || errorMessage
+    }
+    catch {
+      // Response body is not JSON, use statusText
+    }
     throw new Error(`DeepSeek API error ${response.status}: ${errorMessage}`)
   }
 
-  const reader = response.body!.getReader()
+  if (!response.body) {
+    throw new Error('DeepSeek API error: response body is null')
+  }
+
+  const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
@@ -44,6 +56,10 @@ export async function* apiStreamRequest(
       const data = trimmed.slice(5).trim()
       if (data === '[DONE]') {
         return
+      }
+
+      if (!data) {
+        continue
       }
 
       try {

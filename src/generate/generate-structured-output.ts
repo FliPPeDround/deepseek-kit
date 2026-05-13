@@ -1,5 +1,6 @@
 import type { StepEvent } from './types'
 import type { ChatMessage, DeepSeekModel } from '@/model/types'
+import type { Tool } from '@/tool'
 import { z } from 'zod'
 import { formatZodErrors } from './zod-error-formatter'
 
@@ -10,6 +11,7 @@ export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   step?: number
   maxRetries?: number
   onStep?: (step: StepEvent) => void
+  tools?: Tool[]
 }
 
 function buildOutputFormatPrompt(schema: z.ZodTypeAny) {
@@ -32,6 +34,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     maxRetries = 3,
     step = 0,
     onStep,
+    tools,
   } = params
 
   const initialFormatPrompt = buildOutputFormatPrompt(schema)
@@ -47,7 +50,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     const response = await model.invoke({
       messages: currentMessages,
       response_format: { type: 'json_object' },
-      tools: undefined,
+      tools,
     })
 
     const choice = response.choices[0]
@@ -58,8 +61,9 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       onStep?.({
         step: step + attempt,
         type: 'format',
+        usage: response.usage,
         text: lastResponseText,
-        reasoningContent: message.reasoning_content,
+        reasoningContent: message.reasoning_content ?? undefined,
       })
       const parsed = JSON.parse(lastResponseText)
       const result = schema.safeParse(parsed)

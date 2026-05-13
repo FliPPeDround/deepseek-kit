@@ -2,6 +2,7 @@ export async function apiRequest<T>(
   url: string,
   apiKey: string,
   options: Record<string, any>,
+  timeout?: number,
 ): Promise<T> {
   const headers = {
     'Content-Type': 'application/json',
@@ -12,10 +13,17 @@ export async function apiRequest<T>(
     method: 'POST',
     headers,
     body: JSON.stringify(options),
+    signal: timeout ? AbortSignal.timeout(timeout) : undefined,
   })
   if (!response.ok) {
-    const { error } = (await response.json()) as { error: { message: string } }
-    const errorMessage = error?.message || response.statusText
+    let errorMessage = response.statusText
+    try {
+      const body = await response.json() as { error?: { message?: string } }
+      errorMessage = body?.error?.message || errorMessage
+    }
+    catch {
+      // Response body is not JSON, use statusText
+    }
     throw new Error(`DeepSeek API error ${response.status}: ${errorMessage}`)
   }
   return await response.json() as T

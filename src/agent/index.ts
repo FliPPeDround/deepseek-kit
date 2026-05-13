@@ -6,7 +6,7 @@ import { generateText } from '@/generate/generate-text'
 
 export function createAgent<T extends z.ZodTypeAny>(config: AgentOptions<T>) {
   return {
-    generateText: (params: Pick<GenerateTextParams<T>, 'messages'>) => generateText({ ...config, ...params }),
-    generateStream: (params: Pick<GenerateStreamParams<T>, 'messages'>) => generateStream({ ...config, ...params }),
+    generate: (params: Pick<GenerateTextParams<T>, 'messages'>) => generateText({ ...config, ...params }),
+    stream: (params: Pick<GenerateStreamParams<T>, 'messages'>) => generateStream({ ...config, ...params }),
   }
 }
