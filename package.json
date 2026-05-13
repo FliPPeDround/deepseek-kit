@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-agents",
+  "name": "deepseek-kit",
   "type": "module",
   "version": "0.0.0",
   "packageManager": "pnpm@10.33.1",
@@ -7,12 +7,12 @@
   "author": "FliPPeDround <flippedround@qq.com>",
   "license": "MIT",
   "funding": "https://afdian.com/a/flippedround",
-  "homepage": "https://github.com/flippedround/deepseek-agents#readme",
+  "homepage": "https://github.com/flippedround/deepseek-kit#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flippedround/deepseek-agents.git"
+    "url": "git+https://github.com/flippedround/deepseek-kit.git"
   },
-  "bugs": "https://github.com/flippedround/deepseek-agents/issues",
+  "bugs": "https://github.com/flippedround/deepseek-kit/issues",
   "keywords": [],
   "sideEffects": false,
   "exports": {

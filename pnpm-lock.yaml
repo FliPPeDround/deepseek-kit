@@ -134,13 +134,13 @@ importers:
 
   examples/createAgent:
     dependencies:
-      deepseek-agents:
+      deepseek-kit:
         specifier: workspace:*
         version: link:../..
 
   examples/generateText:
     dependencies:
-      deepseek-agents:
+      deepseek-kit:
         specifier: workspace:*
         version: link:../..
 

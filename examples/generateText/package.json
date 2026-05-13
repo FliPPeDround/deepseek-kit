@@ -12,6 +12,6 @@
     "dev": "node index.ts"
   },
   "dependencies": {
-    "deepseek-agents": "workspace:*"
+    "deepseek-kit": "workspace:*"
   }
 }

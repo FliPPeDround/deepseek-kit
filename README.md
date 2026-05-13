@@ -1,4 +1,4 @@
-# deepseek-agents
+# deepseek-kit
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
@@ -23,13 +23,13 @@ Agents framework for Deepseek
 
 <!-- Badges -->
 
-[npm-version-src]: https://img.shields.io/npm/v/deepseek-agents?style=flat&colorA=080f12&colorB=1fa669
-[npm-version-href]: https://npmx.dev/package/deepseek-agents
-[npm-downloads-src]: https://img.shields.io/npm/dm/deepseek-agents?style=flat&colorA=080f12&colorB=1fa669
-[npm-downloads-href]: https://npmx.dev/package/deepseek-agents
-[bundle-src]: https://img.shields.io/bundlephobia/minzip/deepseek-agents?style=flat&colorA=080f12&colorB=1fa669&label=minzip
-[bundle-href]: https://bundlephobia.com/result?p=deepseek-agents
-[license-src]: https://img.shields.io/github/license/antfu/deepseek-agents.svg?style=flat&colorA=080f12&colorB=1fa669
-[license-href]: https://github.com/antfu/deepseek-agents/blob/main/LICENSE
+[npm-version-src]: https://img.shields.io/npm/v/deepseek-kit?style=flat&colorA=080f12&colorB=1fa669
+[npm-version-href]: https://npmx.dev/package/deepseek-kit
+[npm-downloads-src]: https://img.shields.io/npm/dm/deepseek-kit?style=flat&colorA=080f12&colorB=1fa669
+[npm-downloads-href]: https://npmx.dev/package/deepseek-kit
+[bundle-src]: https://img.shields.io/bundlephobia/minzip/deepseek-kit?style=flat&colorA=080f12&colorB=1fa669&label=minzip
+[bundle-href]: https://bundlephobia.com/result?p=deepseek-kit
+[license-src]: https://img.shields.io/github/license/antfu/deepseek-kit.svg?style=flat&colorA=080f12&colorB=1fa669
+[license-href]: https://github.com/antfu/deepseek-kit/blob/main/LICENSE
 [jsdocs-src]: https://img.shields.io/badge/jsdocs-reference-080f12?style=flat&colorA=080f12&colorB=1fa669
-[jsdocs-href]: https://www.jsdocs.io/package/deepseek-agents
+[jsdocs-href]: https://www.jsdocs.io/package/deepseek-kit

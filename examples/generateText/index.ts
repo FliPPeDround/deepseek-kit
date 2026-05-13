@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { createModel, generateText, tool } from 'deepseek-agents'
+import { createModel, generateText, tool } from 'deepseek-kit'
 import { z } from 'zod'
 
 const deepSeek = createModel({
