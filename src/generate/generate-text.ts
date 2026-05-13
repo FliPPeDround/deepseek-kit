@@ -92,6 +92,7 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
         schema: output.schema,
         onStep,
         step,
+        tools,
       })
       return { output: structuredData, usage: totalUsage }
     }

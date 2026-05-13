@@ -40,7 +40,7 @@ export interface StreamOptions {
 export interface ModelOptions {
   baseURL?: string
   apiKey?: string
-  model: Model
+  model?: Model
   userId?: string
   thinking?: {
     type: 'enabled' | 'disabled'

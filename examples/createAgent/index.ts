@@ -2,12 +2,7 @@
 import { createAgent, createModel, tool } from 'deepseek-agents'
 import { z } from 'zod'
 
-const model = createModel({
-  model: 'deepseek-v4-flash',
-  thinking: {
-    type: 'disabled',
-  },
-})
+const model = createModel({})
 const weatherTool = tool({
   name: 'weather',
   description: 'useful when you want to know the weather',
@@ -26,7 +21,7 @@ const weatherTool = tool({
 })
 
 const agent = createAgent({
-  model,
+  model: model('deepseek-v4-flash'),
   tools: [weatherTool],
   output: {
     schema: z.object({
@@ -39,7 +34,7 @@ const agent = createAgent({
   },
 })
 
-const res = await agent.generate({
+await agent.generate({
   messages: [
     {
       role: 'user',
@@ -48,9 +43,9 @@ const res = await agent.generate({
   ],
 })
 
-console.log(res, res.text, res.usage)
+// console.log(res, res.text, res.usage)
 
-const output = await agent.generate({
+await agent.generate({
   messages: [
     {
       role: 'user',
@@ -59,4 +54,4 @@ const output = await agent.generate({
   ],
 })
 
-console.log(output, output.text, output.usage)
+// console.log(output, output.text, output.usage)
