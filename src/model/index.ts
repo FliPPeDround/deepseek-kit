@@ -1,11 +1,13 @@
 import type { InvokeParams, Model, ModelOptions } from './types'
+import type { FIMParams } from '@/fim/types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
 import { DEEPSEEK_API_BASE_URL, DEEPSEEK_API_BETA_MODE_BASE_URL, DEEPSEEK_MODELS } from '@/constants'
+import { fim } from './fim'
 import { invoke, invokeStream } from './invoke'
 import 'dotenv/config'
 
-class DeepSeekModel {
+export class DeepSeekModel {
   public readonly config: ModelOptions
 
   constructor(options: ModelOptions) {
@@ -36,6 +38,11 @@ class DeepSeekModel {
 
   public invokeStream(params: InvokeParams) {
     return invokeStream(this.config, params)
+  }
+
+  public fim(params: Omit<FIMParams, 'model'>) {
+    this._enableBatchMode()
+    return fim(this.config, params)
   }
 
   public _enableBatchMode() {

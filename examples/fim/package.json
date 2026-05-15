@@ -1,9 +1,9 @@
 {
-  "name": "@example/generate-text",
+  "name": "@example/fim",
   "type": "module",
   "version": "1.0.0",
   "packageManager": "pnpm@10.33.1",
-  "description": "Generate text example using the DeepSeek Kit",
+  "description": "FIM example using the DeepSeek Kit",
   "author": "",
   "license": "ISC",
   "keywords": [],

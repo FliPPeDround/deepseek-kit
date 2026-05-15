@@ -2,6 +2,7 @@ import type { DEEPSEEK_MODELS } from '@/constants'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 
+export type { DeepSeekModel } from './index'
 export interface SystemMessage {
   role: 'system'
   content: string
@@ -208,12 +209,6 @@ export interface ChatCompletionChunk {
   model: Model
   choices: ChatCompletionChunkChoice[]
   usage?: Usage | null
-}
-
-export interface DeepSeekModel {
-  config: ModelOptions
-  invoke: (params: InvokeParams) => Promise<ChatCompletion>
-  invokeStream: (params: InvokeParams) => AsyncGenerator<ChatCompletionChunk>
 }
 
 export interface InvokeParams {

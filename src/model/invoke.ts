@@ -5,6 +5,7 @@ import { apiRequest } from '@/client/request'
 import { withRetry } from '@/client/retry'
 import { apiStreamRequest } from '@/client/stream-request'
 import { buildToolParameters } from '@/tool'
+import { compact } from '@/utils'
 
 function requiresBetaEndpoint(tools: Tool[]) {
   return tools.some(tool => tool.strict)
@@ -15,12 +16,6 @@ function buildBaseUrl(config: ModelOptions, needsBeta: boolean): string {
   if (!needsBeta)
     return base
   return base.endsWith('/') ? `${base}beta` : `${base}/beta`
-}
-
-function compact<T extends Record<string, any>>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined && v !== null),
-  ) as T
 }
 
 function buildRequestBody(config: ModelOptions, params: InvokeParams) {

@@ -1,4 +1,5 @@
 export { createAgent } from './agent'
+export { fim } from './fim'
 export { generateStream } from './generate/generate-stream'
 export { generateText } from './generate/generate-text'
 export type { GenerateTextResult } from './generate/types'

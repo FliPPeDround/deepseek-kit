@@ -138,6 +138,12 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  examples/fim:
+    dependencies:
+      deepseek-kit:
+        specifier: workspace:*
+        version: link:../..
+
   examples/generateText:
     dependencies:
       deepseek-kit:

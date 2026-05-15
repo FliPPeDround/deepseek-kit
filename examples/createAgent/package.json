@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "packageManager": "pnpm@10.33.1",
-  "description": "Create an agent using the DeepSeek Agents",
+  "description": "Create an agent example using the DeepSeek Kit",
   "author": "",
   "license": "ISC",
   "keywords": [],
