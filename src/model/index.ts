@@ -50,8 +50,19 @@ export class DeepSeekModel {
   }
 }
 
-export function createModel(options: ModelOptions): (model?: Model) => DeepSeekModel {
-  return (model?: Model): DeepSeekModel => {
-    return new DeepSeekModel({ ...options, model: model || options.model })
+export function createModel(options?: ModelOptions) {
+  let cachedInstance: DeepSeekModel | undefined
+
+  const factory = (model?: Model): DeepSeekModel => {
+    return new DeepSeekModel({ ...options, model: model || options?.model })
   }
+
+  return new Proxy(factory, {
+    get(_target, prop) {
+      if (!cachedInstance) {
+        cachedInstance = factory()
+      }
+      return Reflect.get(cachedInstance, prop)
+    },
+  }) as typeof factory & DeepSeekModel
 }

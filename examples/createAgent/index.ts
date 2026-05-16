@@ -2,7 +2,10 @@
 import { createAgent, createModel, tool } from 'deepseek-kit'
 import { z } from 'zod'
 
-const model = createModel({})
+const model = createModel({
+  model: 'deepseek-v4-pro',
+})
+
 const weatherTool = tool({
   name: 'weather',
   description: 'useful when you want to know the weather',
