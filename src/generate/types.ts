@@ -1,5 +1,6 @@
 import type { z } from 'zod'
-import type { ChatMessage, DeepSeekModel, Usage } from '@/model/types'
+import type { DeepSeekModel } from '@/model'
+import type { ChatMessage, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 

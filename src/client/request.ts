@@ -3,16 +3,21 @@ export async function apiRequest<T>(
   apiKey: string,
   options: Record<string, any>,
   timeout?: number,
+  method: 'GET' | 'POST' = 'POST',
 ): Promise<T> {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Authorization': `Bearer ${apiKey}`,
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${apiKey}`,
   }
+
+  if (method === 'POST') {
+    headers['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(url, {
-    method: 'POST',
+    method,
     headers,
-    body: JSON.stringify(options),
+    body: method === 'POST' ? JSON.stringify(options) : undefined,
     signal: timeout ? AbortSignal.timeout(timeout) : undefined,
   })
   if (!response.ok) {

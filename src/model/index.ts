@@ -1,10 +1,14 @@
+import type { GetBalanceOptions } from './balance'
+import type { ListModelsOptions } from './list'
 import type { InvokeParams, Model, ModelOptions } from './types'
 import type { FIMParams } from '@/fim/types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
 import { DEEPSEEK_API_BASE_URL, DEEPSEEK_API_BETA_MODE_BASE_URL, DEEPSEEK_MODELS } from '@/constants'
+import { getBalance } from './balance'
 import { fim } from './fim'
 import { invoke, invokeStream } from './invoke'
+import { listModels } from './list'
 import 'dotenv/config'
 
 export class DeepSeekModel {
@@ -47,6 +51,14 @@ export class DeepSeekModel {
 
   public _enableBatchMode() {
     this.config.baseURL = DEEPSEEK_API_BETA_MODE_BASE_URL
+  }
+
+  public static list(options?: ListModelsOptions) {
+    return listModels(options)
+  }
+
+  public static balance(options?: GetBalanceOptions) {
+    return getBalance(options)
   }
 }
 

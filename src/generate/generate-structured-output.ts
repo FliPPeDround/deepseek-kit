@@ -1,5 +1,6 @@
 import type { StepEvent } from './types'
-import type { ChatMessage, DeepSeekModel } from '@/model/types'
+import type { DeepSeekModel } from '@/model'
+import type { ChatMessage } from '@/model/types'
 import type { Tool } from '@/tool'
 import { z } from 'zod'
 import { formatZodErrors } from './zod-error-formatter'

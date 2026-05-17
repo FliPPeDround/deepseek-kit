@@ -2,7 +2,6 @@ import type { DEEPSEEK_MODELS } from '@/constants'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 
-export type { DeepSeekModel } from './index'
 export interface SystemMessage {
   role: 'system'
   content: string
@@ -209,6 +208,42 @@ export interface ChatCompletionChunk {
   model: Model
   choices: ChatCompletionChunkChoice[]
   usage?: Usage | null
+}
+
+/**
+ * The model identifier, which can be referenced in the API endpoints.
+ */
+export interface ModelInfo {
+  /** The model identifier, which can be referenced in the API endpoints. */
+  id: string
+  /** The object type, which is always "model". */
+  object: 'model'
+  /** The organization that owns the model. */
+  owned_by: string
+}
+
+/** A list of models. */
+export interface ListModelsResponse {
+  object: 'list'
+  data: ModelInfo[]
+}
+
+export interface BalanceInfo {
+  /** The currency of the balance. */
+  currency: 'CNY' | 'USD'
+  /** The total available balance, including the granted balance and the topped-up balance. */
+  total_balance: string
+  /** The total not expired granted balance. */
+  granted_balance: string
+  /** The total topped-up balance. */
+  topped_up_balance: string
+}
+
+/** User balance info. */
+export interface UserBalanceResponse {
+  /** Whether the user's balance is sufficient for API calls. */
+  is_available: boolean
+  balance_infos: BalanceInfo[]
 }
 
 export interface InvokeParams {

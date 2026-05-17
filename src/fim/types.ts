@@ -1,4 +1,4 @@
-import type { DeepSeekModel } from '@/model/types'
+import type { DeepSeekModel } from '@/model'
 
 export interface FIMParams {
   model: DeepSeekModel
