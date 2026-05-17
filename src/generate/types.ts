@@ -12,12 +12,14 @@ export interface StepEvent {
   toolCalls?: ChatCompletionTool[]
   text?: string
   reasoningContent?: string
+  stop: () => void
 }
 
 export interface BeforeStepContext {
   step: number
   messages: ChatMessage[]
   tools?: Tool[]
+  stop: () => void
 }
 
 export interface BeforeStepResult {
@@ -26,10 +28,14 @@ export interface BeforeStepResult {
   config?: Partial<ModelOptions>
 }
 
+export interface ErrorContext {
+  stop: () => void
+}
+
 export interface GenerateTextHooks {
   beforeStep?: (context: BeforeStepContext) => BeforeStepResult | void
   afterStep?: (step: StepEvent) => void
-  onError?: (error: AgentError) => void | AgentError | Promise<AgentError | void>
+  onError?: (error: AgentError, context: ErrorContext) => void | AgentError | Promise<AgentError | void>
 }
 
 export interface GenerateTextParams<T extends z.ZodTypeAny> {

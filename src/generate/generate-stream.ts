@@ -45,6 +45,11 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
   let step = 0
   let totalUsage: Usage | undefined
 
+  let shouldStop = false
+  const stop = () => {
+    shouldStop = true
+  }
+
   const prevStreamOptions = model.config.streamOptions
   model.config.streamOptions = { ...prevStreamOptions, include_usage: true }
 
@@ -59,7 +64,12 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
             step,
             messages: [...currentMessages],
             tools: currentTools,
+            stop,
           })
+          if (shouldStop) {
+            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+            return
+          }
           if (hookResult?.messages) {
             currentMessages.length = 0
             currentMessages.push(...hookResult.messages)
@@ -146,7 +156,12 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
               total_tokens: 0,
               completion_tokens_details: { reasoning_tokens: 0 },
             },
+            stop,
           })
+          if (shouldStop) {
+            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+            return
+          }
           continue
         }
 
@@ -158,7 +173,12 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
             step,
             tools: currentTools,
             hooks,
+            stop,
           })
+          if (shouldStop) {
+            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+            return
+          }
           yield { type: 'finish', text: JSON.stringify(structuredData), usage: totalUsage ?? undefined }
           return
         }
@@ -175,14 +195,23 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
             total_tokens: 0,
             completion_tokens_details: { reasoning_tokens: 0 },
           },
+          stop,
         })
+        if (shouldStop) {
+          yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+          return
+        }
         yield { type: 'finish', text, usage: totalUsage ?? undefined }
         return
       }
       catch (error) {
         const agentError = classifyError(error, step)
         if (hooks?.onError) {
-          const result = await hooks.onError(agentError)
+          const result = await hooks.onError(agentError, { stop })
+          if (shouldStop) {
+            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+            return
+          }
           if (result instanceof AgentError) {
             throw result
           }
@@ -201,7 +230,11 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
     })
 
     if (hooks?.onError) {
-      const result = await hooks.onError(maxStepsError)
+      const result = await hooks.onError(maxStepsError, { stop })
+      if (shouldStop) {
+        yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+        return
+      }
       if (result instanceof AgentError) {
         throw result
       }

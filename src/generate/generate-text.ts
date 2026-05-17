@@ -58,6 +58,11 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
     completion_tokens_details: { reasoning_tokens: 0 },
   }
 
+  let shouldStop = false
+  const stop = () => {
+    shouldStop = true
+  }
+
   let step = 0
   while (step < maxSteps) {
     step++
@@ -68,7 +73,11 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
           step,
           messages: [...currentMessages],
           tools: currentTools,
+          stop,
         })
+        if (shouldStop) {
+          return { text: '', usage: totalUsage }
+        }
         if (hookResult?.messages) {
           currentMessages.length = 0
           currentMessages.push(...hookResult.messages)
@@ -120,7 +129,11 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
           text: message.content ?? undefined,
           reasoningContent: message.reasoning_content ?? undefined,
           usage: response.usage,
+          stop,
         })
+        if (shouldStop) {
+          return { text: '', usage: totalUsage }
+        }
         continue
       }
 
@@ -132,7 +145,11 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
           hooks,
           step,
           tools: currentTools,
+          stop,
         })
+        if (shouldStop) {
+          return { text: '', usage: totalUsage }
+        }
         return { output: structuredData, usage: totalUsage }
       }
 
@@ -142,19 +159,23 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
         text: message.content || '',
         reasoningContent: message.reasoning_content || '',
         usage: response.usage,
+        stop,
       })
+      if (shouldStop) {
+        return { text: '', usage: totalUsage }
+      }
 
       return { text: message.content || '', usage: totalUsage }
     }
     catch (error) {
       const agentError = classifyError(error, step)
       if (hooks?.onError) {
-        const result = await hooks.onError(agentError)
+        const result = await hooks.onError(agentError, { stop })
+        if (shouldStop) {
+          return { text: '', usage: totalUsage }
+        }
         if (result instanceof AgentError) {
           throw result
-        }
-        if (result === undefined) {
-          // 用户没有抛出错误，继续？或者由用户决定
         }
       }
       else {
@@ -171,7 +192,10 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
   })
 
   if (hooks?.onError) {
-    const result = await hooks.onError(maxStepsError)
+    const result = await hooks.onError(maxStepsError, { stop })
+    if (shouldStop) {
+      return { text: '', usage: totalUsage }
+    }
     if (result instanceof AgentError) {
       throw result
     }

@@ -14,6 +14,7 @@ export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   maxRetries?: number
   hooks?: GenerateTextHooks
   tools?: Tool[]
+  stop?: () => void
 }
 
 function buildOutputFormatPrompt(schema: z.ZodTypeAny) {
@@ -37,7 +38,17 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     step = 0,
     hooks,
     tools,
+    stop,
   } = params
+
+  let shouldStop = false
+  const internalStop = () => {
+    shouldStop = true
+  }
+  const combinedStop = () => {
+    internalStop()
+    stop?.()
+  }
 
   const initialFormatPrompt = buildOutputFormatPrompt(schema)
 
@@ -55,7 +66,11 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
           step: step + attempt,
           messages: [...currentMessages],
           tools,
+          stop: combinedStop,
         })
+        if (shouldStop) {
+          throw new StopLoop()
+        }
         if (hookResult?.messages) {
           currentMessages.length = 0
           currentMessages.push(...hookResult.messages)
@@ -81,8 +96,12 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
         usage: response.usage,
         text: lastResponseText,
         reasoningContent: message.reasoning_content ?? undefined,
+        stop: combinedStop,
       }
       hooks?.afterStep?.(stepEvent)
+      if (shouldStop) {
+        throw new StopLoop()
+      }
       const parsed = JSON.parse(lastResponseText)
       const result = schema.safeParse(parsed)
 
@@ -102,9 +121,15 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       })
     }
     catch (error) {
+      if (error instanceof StopLoop) {
+        throw error
+      }
       const agentError = classifyError(error, step + attempt)
       if (hooks?.onError) {
-        const result = await hooks.onError(agentError)
+        const result = await hooks.onError(agentError, { stop: combinedStop })
+        if (shouldStop) {
+          throw new StopLoop()
+        }
         if (result instanceof AgentError) {
           throw result
         }
@@ -123,7 +148,10 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
   })
 
   if (hooks?.onError) {
-    const result = await hooks.onError(schemaError)
+    const result = await hooks.onError(schemaError, { stop: combinedStop })
+    if (shouldStop) {
+      throw new StopLoop()
+    }
     if (result instanceof AgentError) {
       throw result
     }
@@ -131,5 +159,12 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
   }
   else {
     throw schemaError
+  }
+}
+
+export class StopLoop extends Error {
+  constructor() {
+    super('StopLoop')
+    this.name = 'StopLoop'
   }
 }
