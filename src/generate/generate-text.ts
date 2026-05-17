@@ -2,6 +2,7 @@ import type z from 'zod'
 import type { GenerateOutputResult, GenerateTextParams, GenerateTextResult } from './types'
 import type { ChatCompletionChoice, ChatMessage, Usage } from '@/model/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
+import { AgentError, classifyError } from '@/errors'
 import { generateStructuredOutput } from './generate-structured-output'
 
 function needsToolCall(choice: ChatCompletionChoice) {
@@ -43,10 +44,11 @@ function buildMessage(prompt?: string, system?: string, messages?: ChatMessage[]
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T> & { output: { schema: T } }): Promise<GenerateOutputResult<T>>
 export async function generateText(params: Omit<GenerateTextParams<z.ZodTypeAny>, 'output'>): Promise<GenerateTextResult>
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>) {
-  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, onStep, output } = params
+  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks } = params
   const chatMessage = buildMessage(prompt, system, messages)
 
   const currentMessages: ChatMessage[] = chatMessage
+  let currentTools = tools
   const totalUsage: Usage = {
     completion_tokens: 0,
     prompt_tokens: 0,
@@ -60,71 +62,121 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
   while (step < maxSteps) {
     step++
 
-    const response = await model.invoke({
-      messages: currentMessages,
-      tools,
-    })
-
-    if (response.usage) {
-      mergeUsage(totalUsage, response.usage)
-    }
-
-    const choice = response.choices[0]
-    if (!choice) {
-      throw new Error('DeepSeek API returned empty choices')
-    }
-
-    const message = choice.message
-    currentMessages.push(message as unknown as ChatMessage)
-
-    if (needsToolCall(choice) && tools) {
-      for (const toolCall of message.tool_calls) {
-        const name = toolCall.function?.name
-        const tool = tools.find(tool => tool.name === name)
-        if (tool) {
-          const args = toolCall.function.arguments
-          const result = await tool.execute(args)
-          currentMessages.push({
-            role: 'tool',
-            content: result,
-            tool_call_id: toolCall.id,
-          })
+    try {
+      if (hooks?.beforeStep) {
+        const hookResult = hooks.beforeStep({
+          step,
+          messages: [...currentMessages],
+          tools: currentTools,
+        })
+        if (hookResult?.messages) {
+          currentMessages.length = 0
+          currentMessages.push(...hookResult.messages)
+        }
+        if (hookResult?.tools !== undefined) {
+          currentTools = hookResult.tools
+        }
+        if (hookResult?.config) {
+          model.updateConfig(hookResult.config)
         }
       }
 
-      onStep?.({
+      const response = await model.invoke({
+        messages: currentMessages,
+        tools: currentTools,
+      })
+
+      if (response.usage) {
+        mergeUsage(totalUsage, response.usage)
+      }
+
+      const choice = response.choices[0]
+      if (!choice) {
+        throw new Error('DeepSeek API returned empty choices')
+      }
+
+      const message = choice.message
+      currentMessages.push(message as unknown as ChatMessage)
+
+      if (needsToolCall(choice) && currentTools) {
+        for (const toolCall of message.tool_calls) {
+          const name = toolCall.function?.name
+          const tool = currentTools.find(tool => tool.name === name)
+          if (tool) {
+            const args = toolCall.function.arguments
+            const result = await tool.execute(args)
+            currentMessages.push({
+              role: 'tool',
+              content: result,
+              tool_call_id: toolCall.id,
+            })
+          }
+        }
+
+        hooks?.afterStep?.({
+          step,
+          type: 'tool',
+          toolCalls: message.tool_calls,
+          text: message.content ?? undefined,
+          reasoningContent: message.reasoning_content ?? undefined,
+          usage: response.usage,
+        })
+        continue
+      }
+
+      if (output) {
+        const structuredData = await generateStructuredOutput({
+          model,
+          conversationMessages: currentMessages,
+          schema: output.schema,
+          hooks,
+          step,
+          tools: currentTools,
+        })
+        return { output: structuredData, usage: totalUsage }
+      }
+
+      hooks?.afterStep?.({
         step,
-        type: 'tool',
-        toolCalls: message.tool_calls,
-        text: message.content ?? undefined,
-        reasoningContent: message.reasoning_content ?? undefined,
+        type: 'text',
+        text: message.content || '',
+        reasoningContent: message.reasoning_content || '',
         usage: response.usage,
       })
-      continue
+
+      return { text: message.content || '', usage: totalUsage }
     }
-
-    if (output) {
-      const structuredData = await generateStructuredOutput({
-        model,
-        conversationMessages: currentMessages,
-        schema: output.schema,
-        onStep,
-        step,
-        tools,
-      })
-      return { output: structuredData, usage: totalUsage }
+    catch (error) {
+      const agentError = classifyError(error, step)
+      if (hooks?.onError) {
+        const result = await hooks.onError(agentError)
+        if (result instanceof AgentError) {
+          throw result
+        }
+        if (result === undefined) {
+          // 用户没有抛出错误，继续？或者由用户决定
+        }
+      }
+      else {
+        throw agentError
+      }
     }
-
-    onStep?.({
-      step,
-      type: 'text',
-      text: message.content || '',
-      reasoningContent: message.reasoning_content || '',
-      usage: response.usage,
-    })
-
-    return { text: message.content || '', usage: totalUsage }
   }
 
-  throw new Error(`Max steps (${maxSteps}) reached without getting a final response`)
+  const maxStepsError = new AgentError({
+    message: `Max steps (${maxSteps}) reached without getting a final response`,
+    type: 'max_steps',
+    step: maxSteps,
+    retryable: false,
+  })
+
+  if (hooks?.onError) {
+    const result = await hooks.onError(maxStepsError)
+    if (result instanceof AgentError) {
+      throw result
+    }
+  }
+  else {
+    throw maxStepsError
+  }
 }

@@ -36,6 +36,10 @@ export class DeepSeekModel {
     }
   }
 
+  public updateConfig(options: Partial<ModelOptions>) {
+    Object.assign(this.config, toMerged(this.config, options))
+  }
+
   public invoke(params: InvokeParams) {
     return invoke(this.config, params)
   }

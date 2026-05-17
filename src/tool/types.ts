@@ -7,6 +7,8 @@ export interface ToolDefinition<T extends z.ZodObject> {
   required?: boolean
   schema: T
   execute: (args: z.infer<T>) => string | Promise<string>
+  timeout?: number
+  retries?: number
 }
 
 export interface ToolCall {

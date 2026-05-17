@@ -17,6 +17,8 @@ const weatherTool = tool({
   execute: async (input) => {
     return `${input.city}今天天气晴朗`
   },
+  timeout: 10000,
+  retries: 2,
 })
 
 const weatherSchema = z.object({
@@ -36,8 +38,22 @@ const output = await generateText({
   output: {
     schema: weatherSchema,
   },
-  onStep: (step) => {
-    console.log(step)
+  hooks: {
+    beforeStep: (context) => {
+      console.log('beforeStep', context)
+      // 可以在这里修改 messages、tools、config
+      // 例如:
+      // return {
+      //   messages: [...context.messages, { role: 'system', content: '请用中文回答' }],
+      //   config: { temperature: 0.7 }
+      // }
+    },
+    afterStep: (step) => {
+      console.log('afterStep', step)
+    },
+    onError: (error) => {
+      console.error('onError', error)
+    },
   },
 })
 

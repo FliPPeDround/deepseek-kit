@@ -1,8 +1,52 @@
 import type { ToolCall, ToolChoice, ToolDefinition } from './types'
 import { z } from 'zod'
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout | undefined
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Tool execution timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  }
+  finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
+async function withRetries<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  timeoutMs?: number,
+): Promise<T> {
+  let lastError: Error | undefined
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      if (timeoutMs) {
+        return await withTimeout(fn(), timeoutMs)
+      }
+      return await fn()
+    }
+    catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (i === maxRetries) {
+        throw lastError
+      }
+    }
+  }
+  throw lastError
+}
+
 export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
-  const { schema, execute } = config
+  const { schema, execute, timeout = 60000, retries = 0 } = config
   const jsonSchema = z.toJSONSchema(schema)
 
   if (config.strict) {
@@ -16,7 +60,11 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
       return `Tool execution error: ${message}`
     }
     try {
-      const result = await execute(parsed.data)
+      const result = await withRetries(
+        async () => execute(parsed.data),
+        retries,
+        timeout,
+      )
       return String(result)
     }
     catch (err) {

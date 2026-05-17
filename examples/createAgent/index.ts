@@ -21,6 +21,8 @@ const weatherTool = tool({
     }
     return `${input.city}今天天气晴朗`
   },
+  timeout: 10000,
+  retries: 2,
 })
 
 const agent = createAgent({
@@ -32,8 +34,18 @@ const agent = createAgent({
       weather: z.string(),
     }),
   },
-  onStep: (step) => {
-    console.log(step)
+  hooks: {
+    beforeStep: (context) => {
+      console.log('beforeStep', context)
+    },
+    afterStep: (step) => {
+      console.log('afterStep', step)
+    },
+    onError: (error) => {
+      console.error('onError', error)
+      // 可以决定是否抛出错误或者返回新的错误
+      return error
+    },
   },
 })
 

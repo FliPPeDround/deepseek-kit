@@ -1,6 +1,7 @@
 import type { z } from 'zod'
+import type { AgentError } from '@/errors'
 import type { DeepSeekModel } from '@/model'
-import type { ChatMessage, Usage } from '@/model/types'
+import type { ChatMessage, ModelOptions, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 
@@ -13,6 +14,24 @@ export interface StepEvent {
   reasoningContent?: string
 }
 
+export interface BeforeStepContext {
+  step: number
+  messages: ChatMessage[]
+  tools?: Tool[]
+}
+
+export interface BeforeStepResult {
+  messages?: ChatMessage[]
+  tools?: Tool[]
+  config?: Partial<ModelOptions>
+}
+
+export interface GenerateTextHooks {
+  beforeStep?: (context: BeforeStepContext) => BeforeStepResult | void
+  afterStep?: (step: StepEvent) => void
+  onError?: (error: AgentError) => void | AgentError | Promise<AgentError | void>
+}
+
 export interface GenerateTextParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
   tools?: Tool[]
@@ -23,7 +42,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   output?: {
     schema: T
   }
-  onStep?: (step: StepEvent) => void
+  hooks?: GenerateTextHooks
 }
 
 export interface GenerateTextResult {
@@ -79,4 +98,5 @@ export interface GenerateStreamParams<T extends z.ZodTypeAny> {
   output?: {
     schema: T
   }
+  hooks?: GenerateTextHooks
 }
