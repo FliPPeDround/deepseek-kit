@@ -37,36 +37,46 @@ const agent = createAgent({
   hooks: {
     beforeStep: (context) => {
       console.log('beforeStep', context)
+      if (context.step === 1) {
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: '重庆的天气怎么样',
+            },
+          ],
+        }
+      }
     },
-    afterStep: (step) => {
-      console.log('afterStep', step)
-    },
-    onError: (error) => {
-      console.error('onError', error)
-      // 可以决定是否抛出错误或者返回新的错误
-      return error
-    },
+    // afterStep: (step) => {
+    //   console.log('afterStep', step)
+    // },
+    // onError: (error) => {
+    //   console.error('onError', error)
+    //   // 可以决定是否抛出错误或者返回新的错误
+    //   return error
+    // },
   },
 })
 
-await agent.generate({
+const res = await agent.generate({
   messages: [
     {
       role: 'user',
-      content: '北京天气天气怎么样',
+      content: '北京的天气怎么样',
     },
   ],
 })
 
-// console.log(res, res.text, res.usage)
+console.log(res.output, res.text, res.usage)
 
-await agent.generate({
-  messages: [
-    {
-      role: 'user',
-      content: '重庆天气天气怎么样',
-    },
-  ],
-})
+// await agent.generate({
+//   messages: [
+//     {
+//       role: 'user',
+//       content: '重庆天气天气怎么样',
+//     },
+//   ],
+// })
 
 // console.log(output, output.text, output.usage)

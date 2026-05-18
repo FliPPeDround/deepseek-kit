@@ -1,10 +1,12 @@
 import type z from 'zod'
 import type { GenerateStreamParams, StreamEvent } from './types'
 import type { ChatCompletionChunkDelta, ChatMessage, Usage } from '@/model/types'
+import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
 import { AgentError, classifyError } from '@/errors'
 import { generateStructuredOutput } from './generate-structured-output'
+import { emptyUsage, HookRunner, lastAssistantMsg } from './generate-utils'
 
 function accumulateToolCalls(
   accumulated: ChatCompletionTool[],
@@ -41,14 +43,10 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
   const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, output, hooks } = params
 
   const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
-  let currentTools = tools
+  const currentTools: Tool[] = tools ? [...tools] : []
   let step = 0
   let totalUsage: Usage | undefined
-
-  let shouldStop = false
-  const stop = () => {
-    shouldStop = true
-  }
+  const runner = new HookRunner()
 
   const prevStreamOptions = model.config.streamOptions
   model.config.streamOptions = { ...prevStreamOptions, include_usage: true }
@@ -59,27 +57,10 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
       yield { type: 'step', step }
 
       try {
-        if (hooks?.beforeStep) {
-          const hookResult = hooks.beforeStep({
-            step,
-            messages: [...currentMessages],
-            tools: currentTools,
-            stop,
-          })
-          if (shouldStop) {
-            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
-            return
-          }
-          if (hookResult?.messages) {
-            currentMessages.length = 0
-            currentMessages.push(...hookResult.messages)
-          }
-          if (hookResult?.tools !== undefined) {
-            currentTools = hookResult.tools
-          }
-          if (hookResult?.config) {
-            model.updateConfig(hookResult.config)
-          }
+        runner.runBeforeStep(hooks, step, currentMessages, currentTools, model)
+        if (runner.stopped) {
+          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
+          return
         }
 
         const stream = model.invokeStream({
@@ -121,7 +102,7 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
           }
         }
 
-        if ((finishReason === 'tool_calls' || toolCallsAccumulated.length > 0) && currentTools && toolCallsAccumulated.length > 0) {
+        if ((finishReason === 'tool_calls' || toolCallsAccumulated.length > 0) && currentTools.length > 0 && toolCallsAccumulated.length > 0) {
           currentMessages.push({
             role: 'assistant',
             content: text || null,
@@ -143,23 +124,15 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
           }
 
           yield { type: 'tool-call', step, toolCalls: toolCallsAccumulated }
-          hooks?.afterStep?.({
+          runner.runAfterStep(hooks, {
             step,
             type: 'tool',
             toolCalls: toolCallsAccumulated,
             text: text || undefined,
-            usage: totalUsage ?? {
-              completion_tokens: 0,
-              prompt_tokens: 0,
-              prompt_cache_hit_tokens: 0,
-              prompt_cache_miss_tokens: 0,
-              total_tokens: 0,
-              completion_tokens_details: { reasoning_tokens: 0 },
-            },
-            stop,
+            usage: totalUsage ?? emptyUsage(),
           })
-          if (shouldStop) {
-            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+          if (runner.stopped) {
+            yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
             return
           }
           continue
@@ -173,32 +146,24 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
             step,
             tools: currentTools,
             hooks,
-            stop,
+            hookCtx: runner.hookCtx,
           })
-          if (shouldStop) {
-            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+          if (runner.stopped) {
+            yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
             return
           }
           yield { type: 'finish', text: JSON.stringify(structuredData), usage: totalUsage ?? undefined }
           return
         }
 
-        hooks?.afterStep?.({
+        runner.runAfterStep(hooks, {
           step,
           type: 'text',
           text,
-          usage: totalUsage ?? {
-            completion_tokens: 0,
-            prompt_tokens: 0,
-            prompt_cache_hit_tokens: 0,
-            prompt_cache_miss_tokens: 0,
-            total_tokens: 0,
-            completion_tokens_details: { reasoning_tokens: 0 },
-          },
-          stop,
+          usage: totalUsage ?? emptyUsage(),
         })
-        if (shouldStop) {
-          yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
+        if (runner.stopped) {
+          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
           return
         }
         yield { type: 'finish', text, usage: totalUsage ?? undefined }
@@ -206,18 +171,13 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
       }
       catch (error) {
         const agentError = classifyError(error, step)
-        if (hooks?.onError) {
-          const result = await hooks.onError(agentError, { stop })
-          if (shouldStop) {
-            yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
-            return
-          }
-          if (result instanceof AgentError) {
-            throw result
-          }
+        const result = await runner.runOnError(hooks, agentError)
+        if (runner.stopped) {
+          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
+          return
         }
-        else {
-          throw agentError
+        if (result) {
+          throw result
         }
       }
     }
@@ -229,18 +189,13 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateSt
       retryable: false,
     })
 
-    if (hooks?.onError) {
-      const result = await hooks.onError(maxStepsError, { stop })
-      if (shouldStop) {
-        yield { type: 'finish', text: '', usage: totalUsage ?? undefined }
-        return
-      }
-      if (result instanceof AgentError) {
-        throw result
-      }
+    const result = await runner.runOnError(hooks, maxStepsError)
+    if (runner.stopped) {
+      yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
+      return
     }
-    else {
-      throw maxStepsError
+    if (result) {
+      throw result
     }
   }
   finally {

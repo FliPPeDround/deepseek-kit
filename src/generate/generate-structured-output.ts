@@ -1,9 +1,10 @@
-import type { GenerateTextHooks, StepEvent } from './types'
+import type { GenerateTextHooks, HookContext, StepEvent } from './types'
 import type { DeepSeekModel } from '@/model'
 import type { ChatMessage } from '@/model/types'
 import type { Tool } from '@/tool'
 import { z } from 'zod'
 import { AgentError, classifyError } from '@/errors'
+import { HookRunner, StopLoop } from './generate-utils'
 import { formatZodErrors } from './zod-error-formatter'
 
 export interface StructuredOutputParams<T extends z.ZodTypeAny> {
@@ -14,7 +15,7 @@ export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   maxRetries?: number
   hooks?: GenerateTextHooks
   tools?: Tool[]
-  stop?: () => void
+  hookCtx?: HookContext
 }
 
 function buildOutputFormatPrompt(schema: z.ZodTypeAny) {
@@ -38,17 +39,10 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     step = 0,
     hooks,
     tools,
-    stop,
+    hookCtx,
   } = params
 
-  let shouldStop = false
-  const internalStop = () => {
-    shouldStop = true
-  }
-  const combinedStop = () => {
-    internalStop()
-    stop?.()
-  }
+  const runner = new HookRunner(hookCtx)
 
   const initialFormatPrompt = buildOutputFormatPrompt(schema)
 
@@ -56,34 +50,21 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     ...conversationMessages,
     { role: 'user', content: initialFormatPrompt },
   ]
+  const currentTools: Tool[] = tools ? [...tools] : []
 
   let lastResponseText = ''
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      if (hooks?.beforeStep) {
-        const hookResult = hooks.beforeStep({
-          step: step + attempt,
-          messages: [...currentMessages],
-          tools,
-          stop: combinedStop,
-        })
-        if (shouldStop) {
-          throw new StopLoop()
-        }
-        if (hookResult?.messages) {
-          currentMessages.length = 0
-          currentMessages.push(...hookResult.messages)
-        }
-        if (hookResult?.config) {
-          model.updateConfig(hookResult.config)
-        }
+      runner.runBeforeStep(hooks, step + attempt, currentMessages, currentTools, model)
+      if (runner.stopped) {
+        throw new StopLoop()
       }
 
       const response = await model.invoke({
         messages: currentMessages,
         response_format: { type: 'json_object' },
-        tools,
+        tools: currentTools,
       })
 
       const choice = response.choices[0]
@@ -96,10 +77,9 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
         usage: response.usage,
         text: lastResponseText,
         reasoningContent: message.reasoning_content ?? undefined,
-        stop: combinedStop,
       }
-      hooks?.afterStep?.(stepEvent)
-      if (shouldStop) {
+      runner.runAfterStep(hooks, stepEvent)
+      if (runner.stopped) {
         throw new StopLoop()
       }
       const parsed = JSON.parse(lastResponseText)
@@ -125,17 +105,12 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
         throw error
       }
       const agentError = classifyError(error, step + attempt)
-      if (hooks?.onError) {
-        const result = await hooks.onError(agentError, { stop: combinedStop })
-        if (shouldStop) {
-          throw new StopLoop()
-        }
-        if (result instanceof AgentError) {
-          throw result
-        }
+      const result = await runner.runOnError(hooks, agentError)
+      if (runner.stopped) {
+        throw new StopLoop()
       }
-      else {
-        throw agentError
+      if (result) {
+        throw result
       }
     }
   }
@@ -147,24 +122,12 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     retryable: false,
   })
 
-  if (hooks?.onError) {
-    const result = await hooks.onError(schemaError, { stop: combinedStop })
-    if (shouldStop) {
-      throw new StopLoop()
-    }
-    if (result instanceof AgentError) {
-      throw result
-    }
-    throw schemaError
+  const result = await runner.runOnError(hooks, schemaError)
+  if (runner.stopped) {
+    throw new StopLoop()
   }
-  else {
-    throw schemaError
+  if (result) {
+    throw result
   }
-}
-
-export class StopLoop extends Error {
-  constructor() {
-    super('StopLoop')
-    this.name = 'StopLoop'
-  }
+  throw schemaError
 }

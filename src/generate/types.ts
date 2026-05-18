@@ -12,14 +12,13 @@ export interface StepEvent {
   toolCalls?: ChatCompletionTool[]
   text?: string
   reasoningContent?: string
-  stop: () => void
 }
 
 export interface BeforeStepContext {
   step: number
+  config: ModelOptions
   messages: ChatMessage[]
-  tools?: Tool[]
-  stop: () => void
+  tools: Tool[]
 }
 
 export interface BeforeStepResult {
@@ -28,14 +27,14 @@ export interface BeforeStepResult {
   config?: Partial<ModelOptions>
 }
 
-export interface ErrorContext {
+export interface HookContext {
   stop: () => void
 }
 
 export interface GenerateTextHooks {
-  beforeStep?: (context: BeforeStepContext) => BeforeStepResult | void
-  afterStep?: (step: StepEvent) => void
-  onError?: (error: AgentError, context: ErrorContext) => void | AgentError | Promise<AgentError | void>
+  beforeStep?: (context: BeforeStepContext, hookCtx: HookContext) => BeforeStepResult | void
+  afterStep?: (step: StepEvent, hookCtx: HookContext) => void
+  onError?: (error: AgentError, hookCtx: HookContext) => void | AgentError | Promise<AgentError | void>
 }
 
 export interface GenerateTextParams<T extends z.ZodTypeAny> {
@@ -51,13 +50,9 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   hooks?: GenerateTextHooks
 }
 
-export interface GenerateTextResult {
+export interface GenerateTextResult<TOutput = undefined> {
   text: string
-  usage: Usage
-}
-
-export interface GenerateOutputResult<T extends z.ZodTypeAny> {
-  output: z.infer<T>
+  output: TOutput
   usage: Usage
 }
 

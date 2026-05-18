@@ -1,92 +1,48 @@
 import type z from 'zod'
-import type { GenerateOutputResult, GenerateTextParams, GenerateTextResult } from './types'
-import type { ChatCompletionChoice, ChatMessage, Usage } from '@/model/types'
+import type { GenerateTextParams, GenerateTextResult } from './types'
+import type { ChatMessage, Usage } from '@/model/types'
+import type { Tool } from '@/tool'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
 import { AgentError, classifyError } from '@/errors'
 import { generateStructuredOutput } from './generate-structured-output'
+import { buildMessage, emptyUsage, HookRunner, lastAssistantMsg, mergeUsage, needsToolCall } from './generate-utils'
 
-function needsToolCall(choice: ChatCompletionChoice) {
-  if (choice.finish_reason === 'tool_calls') {
-    return true
+interface GenerateTextParamsWithOutput<T extends z.ZodTypeAny> extends GenerateTextParams<T> {
+  output: {
+    schema: T
   }
-  if (choice.message?.tool_calls?.length > 0) {
-    return true
-  }
-  return false
 }
 
-function mergeUsage(target: Usage, source: Usage): void {
-  target.completion_tokens += source.completion_tokens
-  target.prompt_tokens += source.prompt_tokens
-  target.prompt_cache_hit_tokens += source.prompt_cache_hit_tokens
-  target.prompt_cache_miss_tokens += source.prompt_cache_miss_tokens
-  target.total_tokens += source.total_tokens
-  target.completion_tokens_details.reasoning_tokens += source.completion_tokens_details?.reasoning_tokens ?? 0
+interface GenerateTextParamsWithoutOutput extends GenerateTextParams<z.ZodTypeAny> {
+  output?: never
 }
 
-function buildMessage(prompt?: string, system?: string, messages?: ChatMessage[]): ChatMessage[] {
-  if (!prompt && !system && !messages) {
-    throw new Error('prompt is required')
-  }
-  const message: ChatMessage[] = []
-  if (system) {
-    message.push({ role: 'system', content: system })
-  }
-  if (messages) {
-    message.push(...messages)
-  }
-  if (prompt) {
-    message.push({ role: 'user', content: prompt })
-  }
-  return message
-}
-
-export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T> & { output: { schema: T } }): Promise<GenerateOutputResult<T>>
-export async function generateText(params: Omit<GenerateTextParams<z.ZodTypeAny>, 'output'>): Promise<GenerateTextResult>
-export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>) {
+export async function generateText<T extends z.ZodTypeAny>(
+  params: GenerateTextParamsWithOutput<T>,
+): Promise<GenerateTextResult<z.infer<T>>>
+export async function generateText(
+  params: GenerateTextParamsWithoutOutput,
+): Promise<GenerateTextResult<undefined>>
+export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>): Promise<GenerateTextResult<unknown>> {
   const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks } = params
   const chatMessage = buildMessage(prompt, system, messages)
 
   const currentMessages: ChatMessage[] = chatMessage
-  let currentTools = tools
-  const totalUsage: Usage = {
-    completion_tokens: 0,
-    prompt_tokens: 0,
-    prompt_cache_hit_tokens: 0,
-    prompt_cache_miss_tokens: 0,
-    total_tokens: 0,
-    completion_tokens_details: { reasoning_tokens: 0 },
-  }
-
-  let shouldStop = false
-  const stop = () => {
-    shouldStop = true
-  }
+  const currentTools: Tool[] = tools ? [...tools] : []
+  const totalUsage: Usage = emptyUsage()
+  const runner = new HookRunner()
 
   let step = 0
   while (step < maxSteps) {
     step++
 
     try {
-      if (hooks?.beforeStep) {
-        const hookResult = hooks.beforeStep({
-          step,
-          messages: [...currentMessages],
-          tools: currentTools,
-          stop,
-        })
-        if (shouldStop) {
-          return { text: '', usage: totalUsage }
-        }
-        if (hookResult?.messages) {
-          currentMessages.length = 0
-          currentMessages.push(...hookResult.messages)
-        }
-        if (hookResult?.tools !== undefined) {
-          currentTools = hookResult.tools
-        }
-        if (hookResult?.config) {
-          model.updateConfig(hookResult.config)
+      runner.runBeforeStep(hooks, step, currentMessages, currentTools, model)
+      if (runner.stopped) {
+        return {
+          text: lastAssistantMsg(currentMessages),
+          output: undefined,
+          usage: totalUsage,
         }
       }
 
@@ -107,7 +63,7 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
       const message = choice.message
       currentMessages.push(message as unknown as ChatMessage)
 
-      if (needsToolCall(choice) && currentTools) {
+      if (needsToolCall(choice) && currentTools.length > 0) {
         for (const toolCall of message.tool_calls) {
           const name = toolCall.function?.name
           const tool = currentTools.find(tool => tool.name === name)
@@ -122,17 +78,16 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
           }
         }
 
-        hooks?.afterStep?.({
+        runner.runAfterStep(hooks, {
           step,
           type: 'tool',
           toolCalls: message.tool_calls,
           text: message.content ?? undefined,
           reasoningContent: message.reasoning_content ?? undefined,
           usage: response.usage,
-          stop,
         })
-        if (shouldStop) {
-          return { text: '', usage: totalUsage }
+        if (runner.stopped) {
+          return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
         }
         continue
       }
@@ -145,41 +100,39 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
           hooks,
           step,
           tools: currentTools,
-          stop,
+          hookCtx: runner.hookCtx,
         })
-        if (shouldStop) {
-          return { text: '', usage: totalUsage }
+        if (runner.stopped) {
+          return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
         }
-        return { output: structuredData, usage: totalUsage }
+        return {
+          text: lastAssistantMsg(currentMessages),
+          output: structuredData,
+          usage: totalUsage,
+        }
       }
 
-      hooks?.afterStep?.({
+      runner.runAfterStep(hooks, {
         step,
         type: 'text',
         text: message.content || '',
         reasoningContent: message.reasoning_content || '',
         usage: response.usage,
-        stop,
       })
-      if (shouldStop) {
-        return { text: '', usage: totalUsage }
+      if (runner.stopped) {
+        return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
       }
 
-      return { text: message.content || '', usage: totalUsage }
+      return { text: message.content || '', output: undefined, usage: totalUsage }
     }
     catch (error) {
       const agentError = classifyError(error, step)
-      if (hooks?.onError) {
-        const result = await hooks.onError(agentError, { stop })
-        if (shouldStop) {
-          return { text: '', usage: totalUsage }
-        }
-        if (result instanceof AgentError) {
-          throw result
-        }
+      const result = await runner.runOnError(hooks, agentError)
+      if (runner.stopped) {
+        return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
       }
-      else {
-        throw agentError
+      if (result) {
+        throw result
       }
     }
   }
@@ -191,16 +144,15 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
     retryable: false,
   })
 
-  if (hooks?.onError) {
-    const result = await hooks.onError(maxStepsError, { stop })
-    if (shouldStop) {
-      return { text: '', usage: totalUsage }
-    }
-    if (result instanceof AgentError) {
-      throw result
+  const result = await runner.runOnError(hooks, maxStepsError)
+  if (runner.stopped) {
+    return {
+      text: lastAssistantMsg(currentMessages),
+      output: undefined,
+      usage: totalUsage,
     }
   }
-  else {
-    throw maxStepsError
-  }
+  throw result
+  // if (result) {
+  // }
 }
