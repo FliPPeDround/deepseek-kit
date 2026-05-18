@@ -1,6 +1,6 @@
 import type { GenerateTextHooks, HookContext, StepEvent } from './types'
 import type { DeepSeekModel } from '@/model'
-import type { ChatCompletionChoice, ChatMessage, Usage } from '@/model/types'
+import type { ChatMessage, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
 import { AgentError } from '@/errors'
 
@@ -44,16 +44,6 @@ export function buildMessage(prompt?: string, system?: string, messages?: ChatMe
     message.push({ role: 'user', content: prompt })
   }
   return message
-}
-
-export function needsToolCall(choice: ChatCompletionChoice) {
-  if (choice.finish_reason === 'tool_calls') {
-    return true
-  }
-  if (choice.message?.tool_calls?.length > 0) {
-    return true
-  }
-  return false
 }
 
 export function emptyUsage(): Usage {

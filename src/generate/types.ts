@@ -91,16 +91,26 @@ export type StreamEvent
     | StepStreamEvent
     | FinishStreamEvent
 
-export interface GenerateStreamParams<T extends z.ZodTypeAny> {
-  model: DeepSeekModel
-  tools?: Tool[]
-  system?: string
-  messages: ChatMessage[]
-  maxSteps?: number
-  prompt?: string
-  output?: {
-    schema: T
-  }
-  hooks?: GenerateTextHooks
-  signal?: AbortSignal
+export interface StepResult {
+  text: string
+  toolCalls: ChatCompletionTool[]
+  finishReason: string | null
+  usage: Usage
+  assistantMessage: ChatMessage
+  reasoningContent?: string
 }
+
+export type StepInvoker = (
+  model: DeepSeekModel,
+  params: {
+    messages: ChatMessage[]
+    tools: Tool[]
+    signal?: AbortSignal
+  },
+) => AsyncGenerator<StreamEvent, StepResult>
+
+export interface StepRef {
+  value: number
+}
+
+export type GenerateStreamParams<T extends z.ZodTypeAny> = GenerateTextParams<T>

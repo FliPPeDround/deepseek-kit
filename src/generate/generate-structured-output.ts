@@ -1,4 +1,4 @@
-import type { GenerateTextHooks, HookContext, StepEvent } from './types'
+import type { GenerateTextHooks, HookContext, StepEvent, StepRef } from './types'
 import type { DeepSeekModel } from '@/model'
 import type { ChatMessage } from '@/model/types'
 import type { Tool } from '@/tool'
@@ -11,7 +11,7 @@ export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
   conversationMessages: ChatMessage[]
   schema: T
-  step?: number
+  stepRef: StepRef
   maxRetries?: number
   hooks?: GenerateTextHooks
   tools?: Tool[]
@@ -36,8 +36,8 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     model,
     conversationMessages,
     schema,
+    stepRef,
     maxRetries = 3,
-    step = 0,
     hooks,
     tools,
     hookCtx,
@@ -57,8 +57,10 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
   let lastResponseText = ''
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    stepRef.value++
+    const currentStep = stepRef.value
     try {
-      runner.runBeforeStep(hooks, step + attempt, currentMessages, currentTools, model)
+      runner.runBeforeStep(hooks, currentStep, currentMessages, currentTools, model)
       if (runner.stopped) {
         throw new StopLoop()
       }
@@ -75,7 +77,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       lastResponseText = message.content || ''
 
       const stepEvent: StepEvent = {
-        step: step + attempt,
+        step: currentStep,
         type: 'format',
         usage: response.usage,
         text: lastResponseText,
@@ -122,7 +124,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       if (error instanceof StopLoop) {
         throw error
       }
-      const agentError = classifyError(error, step + attempt)
+      const agentError = classifyError(error, currentStep)
       const result = await runner.runOnError(hooks, agentError)
       if (runner.stopped) {
         throw new StopLoop()
@@ -136,7 +138,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
   const schemaError = new AgentError({
     message: `Structured output still does not match schema after ${maxRetries} retries. Last output: ${lastResponseText.substring(0, 200)}`,
     type: 'schema_error',
-    step: step + maxRetries,
+    step: stepRef.value,
     retryable: false,
   })
 
