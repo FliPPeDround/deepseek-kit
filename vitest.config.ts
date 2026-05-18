@@ -5,7 +5,6 @@ import { defineConfig } from 'vitest/config'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Load .env file
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 export default defineConfig({
@@ -16,5 +15,11 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    include: [
+      'test/**/*.test.ts',
+    ],
+    typecheck: {
+      enabled: false,
+    },
   },
 })
