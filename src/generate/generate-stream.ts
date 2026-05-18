@@ -6,7 +6,7 @@ import type { ChatCompletionTool } from '@/tool/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
 import { AgentError, classifyError } from '@/errors'
 import { generateStructuredOutput } from './generate-structured-output'
-import { emptyUsage, HookRunner, lastAssistantMsg } from './generate-utils'
+import { buildMessage, emptyUsage, HookRunner, lastAssistantMsg, mergeUsage } from './generate-utils'
 
 function accumulateToolCalls(
   accumulated: ChatCompletionTool[],
@@ -40,165 +40,162 @@ function accumulateToolCalls(
 }
 
 export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateStreamParams<T>): AsyncGenerator<StreamEvent> {
-  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, output, hooks } = params
+  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal } = params
 
-  const currentMessages: ChatMessage[] = system ? [{ role: 'system', content: system }, ...messages] : messages
+  const currentMessages: ChatMessage[] = buildMessage(prompt, system, messages)
   const currentTools: Tool[] = tools ? [...tools] : []
   let step = 0
-  let totalUsage: Usage | undefined
+  const totalUsage: Usage = emptyUsage()
   const runner = new HookRunner()
 
-  const prevStreamOptions = model.config.streamOptions
-  model.config.streamOptions = { ...prevStreamOptions, include_usage: true }
+  let currentModel = model.withConfig({ streamOptions: { include_usage: true } })
 
-  try {
-    while (step < maxSteps) {
-      step++
-      yield { type: 'step', step }
+  while (step < maxSteps) {
+    step++
+    yield { type: 'step', step }
 
-      try {
-        runner.runBeforeStep(hooks, step, currentMessages, currentTools, model)
-        if (runner.stopped) {
-          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
-          return
+    currentModel = runner.runBeforeStep(hooks, step, currentMessages, currentTools, currentModel)
+
+    if (runner.stopped) {
+      yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
+      return
+    }
+
+    try {
+      const stream = currentModel.invokeStream({
+        messages: currentMessages,
+        tools: currentTools,
+        signal,
+      })
+
+      let text = ''
+      let toolCallsAccumulated: ChatCompletionTool[] = []
+      let finishReason: string | null = null
+
+      for await (const chunk of stream) {
+        if (chunk.usage) {
+          mergeUsage(totalUsage, chunk.usage)
         }
 
-        const stream = model.invokeStream({
-          messages: currentMessages,
-          tools: currentTools,
-        })
-
-        let text = ''
-        let toolCallsAccumulated: ChatCompletionTool[] = []
-        let finishReason: string | null = null
-
-        for await (const chunk of stream) {
-          if (chunk.usage) {
-            totalUsage = chunk.usage
-          }
-
-          const choice = chunk.choices[0]
-          if (!choice) {
-            continue
-          }
-
-          const delta = choice.delta
-
-          if (delta.content) {
-            text += delta.content
-            yield { type: 'text-delta', textDelta: delta.content }
-          }
-
-          if (delta.reasoning_content) {
-            yield { type: 'reasoning-delta', reasoningDelta: delta.reasoning_content }
-          }
-
-          if (delta.tool_calls) {
-            toolCallsAccumulated = accumulateToolCalls(toolCallsAccumulated, delta.tool_calls)
-          }
-
-          if (choice.finish_reason) {
-            finishReason = choice.finish_reason
-          }
-        }
-
-        if ((finishReason === 'tool_calls' || toolCallsAccumulated.length > 0) && currentTools.length > 0 && toolCallsAccumulated.length > 0) {
-          currentMessages.push({
-            role: 'assistant',
-            content: text || null,
-            tool_calls: toolCallsAccumulated,
-          } as unknown as ChatMessage)
-
-          for (const toolCall of toolCallsAccumulated) {
-            const name = toolCall.function?.name
-            const tool = currentTools.find(t => t.name === name)
-            if (tool) {
-              const args = toolCall.function.arguments
-              const result = await tool.execute(args)
-              currentMessages.push({
-                role: 'tool',
-                content: result,
-                tool_call_id: toolCall.id,
-              })
-            }
-          }
-
-          yield { type: 'tool-call', step, toolCalls: toolCallsAccumulated }
-          runner.runAfterStep(hooks, {
-            step,
-            type: 'tool',
-            toolCalls: toolCallsAccumulated,
-            text: text || undefined,
-            usage: totalUsage ?? emptyUsage(),
-          })
-          if (runner.stopped) {
-            yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
-            return
-          }
+        const choice = chunk.choices[0]
+        if (!choice) {
           continue
         }
 
-        if (output) {
-          const structuredData = await generateStructuredOutput({
-            model,
-            conversationMessages: currentMessages,
-            schema: output.schema,
-            step,
-            tools: currentTools,
-            hooks,
-            hookCtx: runner.hookCtx,
-          })
-          if (runner.stopped) {
-            yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
-            return
-          }
-          yield { type: 'finish', text: JSON.stringify(structuredData), usage: totalUsage ?? undefined }
-          return
+        const delta = choice.delta
+
+        if (delta.content) {
+          text += delta.content
+          yield { type: 'text-delta', textDelta: delta.content }
         }
 
+        if (delta.reasoning_content) {
+          yield { type: 'reasoning-delta', reasoningDelta: delta.reasoning_content }
+        }
+
+        if (delta.tool_calls) {
+          toolCallsAccumulated = accumulateToolCalls(toolCallsAccumulated, delta.tool_calls)
+        }
+
+        if (choice.finish_reason) {
+          finishReason = choice.finish_reason
+        }
+      }
+
+      if ((finishReason === 'tool_calls' || toolCallsAccumulated.length > 0) && currentTools.length > 0 && toolCallsAccumulated.length > 0) {
+        currentMessages.push({
+          role: 'assistant',
+          content: text || null,
+          tool_calls: toolCallsAccumulated,
+        } as unknown as ChatMessage)
+
+        const toolResults = await Promise.all(
+          toolCallsAccumulated.map(async (toolCall) => {
+            const name = toolCall.function?.name
+            const tool = currentTools.find(t => t.name === name)
+            const result = tool
+              ? await tool.execute(toolCall.function.arguments)
+              : `Tool execution error: Tool "${name}" not found`
+            return { tool_call_id: toolCall.id, content: result }
+          }),
+        )
+        for (const { tool_call_id, content } of toolResults) {
+          currentMessages.push({ role: 'tool', content, tool_call_id })
+        }
+
+        yield { type: 'tool-call', step, toolCalls: toolCallsAccumulated }
         runner.runAfterStep(hooks, {
           step,
-          type: 'text',
-          text,
-          usage: totalUsage ?? emptyUsage(),
+          type: 'tool',
+          toolCalls: toolCallsAccumulated,
+          text: text || undefined,
+          usage: totalUsage,
         })
         if (runner.stopped) {
-          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
+          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
           return
         }
-        yield { type: 'finish', text, usage: totalUsage ?? undefined }
+        continue
+      }
+
+      if (output) {
+        const structuredData = await generateStructuredOutput({
+          model: currentModel,
+          conversationMessages: currentMessages,
+          schema: output.schema,
+          step,
+          tools: currentTools,
+          hooks,
+          hookCtx: runner.hookCtx,
+          signal,
+        })
+        if (runner.stopped) {
+          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
+          return
+        }
+        yield { type: 'finish', text: JSON.stringify(structuredData), usage: totalUsage }
         return
       }
-      catch (error) {
-        const agentError = classifyError(error, step)
-        const result = await runner.runOnError(hooks, agentError)
-        if (runner.stopped) {
-          yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
-          return
-        }
-        if (result) {
-          throw result
-        }
+
+      runner.runAfterStep(hooks, {
+        step,
+        type: 'text',
+        text,
+        usage: totalUsage,
+      })
+      if (runner.stopped) {
+        yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
+        return
       }
-    }
-
-    const maxStepsError = new AgentError({
-      message: `Max steps (${maxSteps}) reached without getting a final response`,
-      type: 'max_steps',
-      step: maxSteps,
-      retryable: false,
-    })
-
-    const result = await runner.runOnError(hooks, maxStepsError)
-    if (runner.stopped) {
-      yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage ?? undefined }
+      yield { type: 'finish', text, usage: totalUsage }
       return
     }
-    if (result) {
-      throw result
+    catch (error) {
+      const agentError = classifyError(error, step)
+      const result = await runner.runOnError(hooks, agentError)
+      if (runner.stopped) {
+        yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
+        return
+      }
+      if (result) {
+        throw result
+      }
     }
   }
-  finally {
-    model.config.streamOptions = prevStreamOptions
+
+  const maxStepsError = new AgentError({
+    message: `Max steps (${maxSteps}) reached without getting a final response`,
+    type: 'max_steps',
+    step: maxSteps,
+    retryable: false,
+  })
+
+  const result = await runner.runOnError(hooks, maxStepsError)
+  if (runner.stopped) {
+    yield { type: 'finish', text: lastAssistantMsg(currentMessages), usage: totalUsage }
+    return
+  }
+  if (result) {
+    throw result
   }
 }

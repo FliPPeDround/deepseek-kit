@@ -18,6 +18,7 @@ export type AssistantMessage = {
   role: 'assistant'
   content: string | null
   name?: string
+  tool_calls?: ChatCompletionTool[]
 } & (
   | { prefix: true, reasoning_content?: string }
   | { prefix?: false | undefined, reasoning_content?: undefined }
@@ -54,6 +55,13 @@ export interface ModelOptions {
   timeout?: number
   /** Maximum number of retries on 429/500/503 errors. Defaults to 3. */
   maxRetries?: number
+}
+
+export type ResolvedModelOptions = Required<ModelOptions> & {
+  baseURL: string
+  apiKey: string
+  model: Model
+  thinking: { type: 'enabled' | 'disabled' }
 }
 
 export interface LogProbsContent {
@@ -255,4 +263,5 @@ export interface InvokeParams {
   stop?: string | string[]
   logprobs?: boolean
   topLogprobs?: number
+  signal?: AbortSignal
 }

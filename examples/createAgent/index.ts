@@ -45,6 +45,9 @@ const agent = createAgent({
               content: '重庆的天气怎么样',
             },
           ],
+          config: {
+            model: 'deepseek-v4-flash',
+          },
         }
       }
     },

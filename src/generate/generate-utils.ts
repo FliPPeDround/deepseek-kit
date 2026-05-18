@@ -12,7 +12,12 @@ export class StopLoop extends Error {
 }
 
 export function lastAssistantMsg(messages: ChatMessage[]) {
-  return messages.reverse().find(msg => msg.role === 'assistant')?.content || ''
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') {
+      return messages[i].content || ''
+    }
+  }
+  return ''
 }
 
 export function mergeUsage(target: Usage, source: Usage): void {
@@ -87,9 +92,9 @@ export class HookRunner {
     currentMessages: ChatMessage[],
     currentTools: Tool[],
     model: DeepSeekModel,
-  ): void {
+  ): DeepSeekModel {
     if (!hooks?.beforeStep) {
-      return
+      return model
     }
     const hookResult = hooks.beforeStep({
       step,
@@ -106,8 +111,9 @@ export class HookRunner {
       currentTools.push(...hookResult.tools)
     }
     if (hookResult?.config) {
-      model.updateConfig(hookResult.config)
+      return model.withConfig(hookResult.config)
     }
+    return model
   }
 
   runAfterStep(hooks: GenerateTextHooks | undefined, stepEvent: StepEvent): void {

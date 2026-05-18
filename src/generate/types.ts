@@ -48,6 +48,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
     schema: T
   }
   hooks?: GenerateTextHooks
+  signal?: AbortSignal
 }
 
 export interface GenerateTextResult<TOutput = undefined> {
@@ -96,8 +97,10 @@ export interface GenerateStreamParams<T extends z.ZodTypeAny> {
   system?: string
   messages: ChatMessage[]
   maxSteps?: number
+  prompt?: string
   output?: {
     schema: T
   }
   hooks?: GenerateTextHooks
+  signal?: AbortSignal
 }

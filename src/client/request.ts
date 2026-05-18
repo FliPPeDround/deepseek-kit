@@ -1,9 +1,12 @@
+import { ApiRequestError, handleErrorResponse } from './errors'
+
 export async function apiRequest<T>(
   url: string,
   apiKey: string,
   options: Record<string, any>,
   timeout?: number,
   method: 'GET' | 'POST' = 'POST',
+  signal?: AbortSignal,
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -14,22 +17,21 @@ export async function apiRequest<T>(
     headers['Content-Type'] = 'application/json'
   }
 
+  const timeoutSignal = timeout ? AbortSignal.timeout(timeout) : undefined
+  const combinedSignal = signal && timeoutSignal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : (signal || timeoutSignal)
+
   const response = await fetch(url, {
     method,
     headers,
     body: method === 'POST' ? JSON.stringify(options) : undefined,
-    signal: timeout ? AbortSignal.timeout(timeout) : undefined,
+    signal: combinedSignal,
   })
+
   if (!response.ok) {
-    let errorMessage = response.statusText
-    try {
-      const body = await response.json() as { error?: { message?: string } }
-      errorMessage = body?.error?.message || errorMessage
-    }
-    catch {
-      // Response body is not JSON, use statusText
-    }
-    throw new Error(`DeepSeek API error ${response.status}: ${errorMessage}`)
+    throw new ApiRequestError(await handleErrorResponse(response))
   }
+
   return await response.json() as T
 }

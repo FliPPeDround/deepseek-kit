@@ -16,6 +16,7 @@ export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   hooks?: GenerateTextHooks
   tools?: Tool[]
   hookCtx?: HookContext
+  signal?: AbortSignal
 }
 
 function buildOutputFormatPrompt(schema: z.ZodTypeAny) {
@@ -40,6 +41,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
     hooks,
     tools,
     hookCtx,
+    signal,
   } = params
 
   const runner = new HookRunner(hookCtx)
@@ -65,6 +67,7 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
         messages: currentMessages,
         response_format: { type: 'json_object' },
         tools: currentTools,
+        signal,
       })
 
       const choice = response.choices[0]
@@ -82,7 +85,22 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       if (runner.stopped) {
         throw new StopLoop()
       }
-      const parsed = JSON.parse(lastResponseText)
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(lastResponseText)
+      }
+      catch {
+        currentMessages.push({
+          role: 'assistant',
+          content: lastResponseText,
+        })
+        currentMessages.push({
+          role: 'user',
+          content: 'Your previous output is not valid JSON. Please output only a valid JSON object without any extra text or formatting.',
+        })
+        continue
+      }
+
       const result = schema.safeParse(parsed)
 
       if (result.success) {

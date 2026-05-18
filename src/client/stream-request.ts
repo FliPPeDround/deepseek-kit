@@ -1,32 +1,33 @@
 import type { ChatCompletionChunk } from '@/model/types'
+import { ApiRequestError, handleErrorResponse } from './errors'
 
 export async function* apiStreamRequest(
   url: string,
   apiKey: string,
   options: Record<string, any>,
   timeout?: number,
+  signal?: AbortSignal,
 ): AsyncGenerator<ChatCompletionChunk> {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'text/event-stream',
     'Authorization': `Bearer ${apiKey}`,
   }
+
+  const timeoutSignal = timeout ? AbortSignal.timeout(timeout) : undefined
+  const combinedSignal = signal && timeoutSignal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : (signal || timeoutSignal)
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify({ ...options, stream: true }),
-    signal: timeout ? AbortSignal.timeout(timeout) : undefined,
+    signal: combinedSignal,
   })
+
   if (!response.ok) {
-    let errorMessage = response.statusText
-    try {
-      const body = await response.json() as { error?: { message?: string } }
-      errorMessage = body?.error?.message || errorMessage
-    }
-    catch {
-      // Response body is not JSON, use statusText
-    }
-    throw new Error(`DeepSeek API error ${response.status}: ${errorMessage}`)
+    throw new ApiRequestError(await handleErrorResponse(response))
   }
 
   if (!response.body) {

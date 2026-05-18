@@ -1,6 +1,6 @@
 import type { GetBalanceOptions } from './balance'
 import type { ListModelsOptions } from './list'
-import type { InvokeParams, Model, ModelOptions } from './types'
+import type { InvokeParams, Model, ModelOptions, ResolvedModelOptions } from './types'
 import type { FIMParams } from '@/fim/types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
@@ -12,49 +12,34 @@ import { listModels } from './list'
 import 'dotenv/config'
 
 export class DeepSeekModel {
-  public readonly config: ModelOptions
+  private readonly _config: ResolvedModelOptions
 
   constructor(options: ModelOptions) {
-    this.config = toMerged(
-      {
-        apiKey: process.env.DEEPSEEK_API_KEY,
-        baseURL: process.env.DEEPSEEK_API_BASE_URL || DEEPSEEK_API_BASE_URL,
-        thinking: {
-          type: 'enabled',
-        },
-        reasoningEffort: options.thinking?.type === 'disabled' ? undefined : 'high',
-      },
-      options,
-    )
-
-    if (!this.config.apiKey) {
-      throw new Error('DEEPSEEK_API_KEY is required')
-    }
-
-    if (!this.config.model) {
-      throw new Error(`model is required, available models: ${DEEPSEEK_MODELS.join(', ')}`)
-    }
+    this._config = resolveConfig(options)
   }
 
-  public updateConfig(options: Partial<ModelOptions>) {
-    Object.assign(this.config, toMerged(this.config, options))
+  public get config(): ResolvedModelOptions {
+    return this._config
   }
 
   public invoke(params: InvokeParams) {
-    return invoke(this.config, params)
+    return invoke(this._config, params)
   }
 
   public invokeStream(params: InvokeParams) {
-    return invokeStream(this.config, params)
+    return invokeStream(this._config, params)
   }
 
   public fim(params: Omit<FIMParams, 'model'>) {
-    this._enableBatchMode()
-    return fim(this.config, params)
+    const batchConfig = {
+      ...this._config,
+      baseURL: DEEPSEEK_API_BETA_MODE_BASE_URL,
+    }
+    return fim(batchConfig, params)
   }
 
-  public _enableBatchMode() {
-    this.config.baseURL = DEEPSEEK_API_BETA_MODE_BASE_URL
+  public withConfig(options: Partial<ModelOptions>): DeepSeekModel {
+    return new DeepSeekModel(toMerged(this._config, options) as ModelOptions)
   }
 
   public static list(options?: ListModelsOptions) {
@@ -66,19 +51,33 @@ export class DeepSeekModel {
   }
 }
 
-export function createModel(options?: ModelOptions) {
-  let cachedInstance: DeepSeekModel | undefined
+export function resolveConfig(options: ModelOptions): ResolvedModelOptions {
+  const resolved = toMerged(
+    {
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      baseURL: process.env.DEEPSEEK_API_BASE_URL || DEEPSEEK_API_BASE_URL,
+      thinking: {
+        type: 'enabled',
+      },
+      reasoningEffort: options.thinking?.type === 'disabled' ? undefined : 'high',
+    },
+    options,
+  ) as ResolvedModelOptions
 
-  const factory = (model?: Model): DeepSeekModel => {
-    return new DeepSeekModel({ ...options, model: model || options?.model })
+  if (!resolved.apiKey) {
+    throw new Error('DEEPSEEK_API_KEY is required')
   }
 
-  return new Proxy(factory, {
-    get(_target, prop) {
-      if (!cachedInstance) {
-        cachedInstance = factory()
-      }
-      return Reflect.get(cachedInstance, prop)
-    },
-  }) as typeof factory & DeepSeekModel
+  if (!resolved.model) {
+    throw new Error(`model is required, available models: ${DEEPSEEK_MODELS.join(', ')}`)
+  }
+
+  return resolved
+}
+
+export function createModel(options?: ModelOptions) {
+  return (model?: Model) => new DeepSeekModel({
+    ...options,
+    model: model || options?.model,
+  })
 }

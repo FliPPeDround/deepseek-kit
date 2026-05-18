@@ -45,6 +45,21 @@ async function withRetries<T>(
   throw lastError
 }
 
+export function serializeResult(result: unknown): string {
+  if (typeof result === 'string') {
+    return result
+  }
+  if (result === null || result === undefined) {
+    return String(result)
+  }
+  try {
+    return JSON.stringify(result)
+  }
+  catch {
+    return String(result)
+  }
+}
+
 export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   const { schema, execute, timeout = 60000, retries = 0 } = config
   const jsonSchema = z.toJSONSchema(schema)
@@ -53,22 +68,29 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
     enforceStrictSchema(jsonSchema)
   }
 
-  const wrappedExecute = async (args: string) => {
-    const parsed = schema.safeParse(JSON.parse(args))
-    if (!parsed.success) {
-      const message = parsed.error.issues.map(issue => issue.message).join(', ')
-      return `Tool execution error: ${message}`
+  const wrappedExecute = async (args: string): Promise<string> => {
+    let parsed: z.infer<T>
+    try {
+      parsed = schema.parse(JSON.parse(args))
     }
+    catch (err) {
+      if (err instanceof z.ZodError) {
+        const messages = err.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')
+        return JSON.stringify({ success: false, error: `Invalid arguments: ${messages}` })
+      }
+      return JSON.stringify({ success: false, error: `Failed to parse arguments: ${err instanceof Error ? err.message : String(err)}` })
+    }
+
     try {
       const result = await withRetries(
-        async () => execute(parsed.data),
+        async () => execute(parsed),
         retries,
         timeout,
       )
-      return String(result)
+      return JSON.stringify({ success: true, data: result })
     }
     catch (err) {
-      return `Tool execution error: ${err instanceof Error ? err.message : String(err)}`
+      return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) })
     }
   }
 

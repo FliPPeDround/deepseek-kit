@@ -1,12 +1,30 @@
 import type { z } from 'zod'
 
+export type ToolResult = unknown
+
+export interface ToolExecutionError extends Error {
+  recoverable: false
+}
+
+export interface ToolSuccess<T = unknown> {
+  success: true
+  data: T
+}
+
+export interface ToolFailure {
+  success: false
+  error: string
+}
+
+export type ToolResultType = ToolSuccess | ToolFailure
+
 export interface ToolDefinition<T extends z.ZodObject> {
   name: string
   description: string
   strict?: boolean
   required?: boolean
   schema: T
-  execute: (args: z.infer<T>) => string | Promise<string>
+  execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
   timeout?: number
   retries?: number
 }

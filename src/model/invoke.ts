@@ -53,7 +53,7 @@ export async function invoke(config: ModelOptions, params: InvokeParams): Promis
   const maxRetries = config.maxRetries ?? 3
   const timeout = config.timeout ?? 60000
   return withRetry(
-    () => apiRequest<ChatCompletion>(url, config.apiKey!, body, timeout),
+    () => apiRequest<ChatCompletion>(url, config.apiKey!, body, timeout, 'POST', params.signal),
     maxRetries,
   )
 }
@@ -63,5 +63,5 @@ export async function* invokeStream(config: ModelOptions, params: InvokeParams):
   const needsBeta = requiresBetaEndpoint(params.tools ?? [])
   const url = getChatEndpoint(buildBaseUrl(config, needsBeta))
   const timeout = config.timeout ?? 60000
-  yield* apiStreamRequest(url, config.apiKey!, body, timeout)
+  yield* apiStreamRequest(url, config.apiKey!, body, timeout, params.signal)
 }

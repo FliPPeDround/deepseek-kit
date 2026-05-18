@@ -24,7 +24,7 @@ export async function generateText(
   params: GenerateTextParamsWithoutOutput,
 ): Promise<GenerateTextResult<undefined>>
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>): Promise<GenerateTextResult<unknown>> {
-  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks } = params
+  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal } = params
   const chatMessage = buildMessage(prompt, system, messages)
 
   const currentMessages: ChatMessage[] = chatMessage
@@ -32,23 +32,26 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
   const totalUsage: Usage = emptyUsage()
   const runner = new HookRunner()
 
+  let currentModel = model
   let step = 0
   while (step < maxSteps) {
     step++
 
-    try {
-      runner.runBeforeStep(hooks, step, currentMessages, currentTools, model)
-      if (runner.stopped) {
-        return {
-          text: lastAssistantMsg(currentMessages),
-          output: undefined,
-          usage: totalUsage,
-        }
-      }
+    currentModel = runner.runBeforeStep(hooks, step, currentMessages, currentTools, currentModel)
 
-      const response = await model.invoke({
+    if (runner.stopped) {
+      return {
+        text: lastAssistantMsg(currentMessages),
+        output: undefined,
+        usage: totalUsage,
+      }
+    }
+
+    try {
+      const response = await currentModel.invoke({
         messages: currentMessages,
         tools: currentTools,
+        signal,
       })
 
       if (response.usage) {
@@ -64,18 +67,18 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
       currentMessages.push(message as unknown as ChatMessage)
 
       if (needsToolCall(choice) && currentTools.length > 0) {
-        for (const toolCall of message.tool_calls) {
-          const name = toolCall.function?.name
-          const tool = currentTools.find(tool => tool.name === name)
-          if (tool) {
-            const args = toolCall.function.arguments
-            const result = await tool.execute(args)
-            currentMessages.push({
-              role: 'tool',
-              content: result,
-              tool_call_id: toolCall.id,
-            })
-          }
+        const toolResults = await Promise.all(
+          message.tool_calls.map(async (toolCall) => {
+            const name = toolCall.function?.name
+            const tool = currentTools.find(t => t.name === name)
+            const result = tool
+              ? await tool.execute(toolCall.function.arguments)
+              : `Tool execution error: Tool "${name}" not found`
+            return { tool_call_id: toolCall.id, content: result }
+          }),
+        )
+        for (const { tool_call_id, content } of toolResults) {
+          currentMessages.push({ role: 'tool', content, tool_call_id })
         }
 
         runner.runAfterStep(hooks, {
@@ -94,13 +97,14 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
 
       if (output) {
         const structuredData = await generateStructuredOutput({
-          model,
+          model: currentModel,
           conversationMessages: currentMessages,
           schema: output.schema,
           hooks,
           step,
           tools: currentTools,
           hookCtx: runner.hookCtx,
+          signal,
         })
         if (runner.stopped) {
           return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
@@ -153,6 +157,4 @@ export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextP
     }
   }
   throw result
-  // if (result) {
-  // }
 }

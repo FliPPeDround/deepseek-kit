@@ -39,17 +39,7 @@ export function classifyError(error: unknown, step?: number): AgentError {
   }
 
   if (error instanceof Error) {
-    // 检查错误消息关键词
-    const msg = error.message.toLowerCase()
-    if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) {
-      return new AgentError({
-        message: error.message,
-        type: 'rate_limit',
-        step,
-        cause: error,
-      })
-    }
-    if (msg.includes('timeout') || msg.includes('abort') || msg.includes('timed out')) {
+    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
       return new AgentError({
         message: error.message,
         type: 'timeout',
@@ -57,23 +47,19 @@ export function classifyError(error: unknown, step?: number): AgentError {
         cause: error,
       })
     }
-    if (msg.includes('fetch') || msg.includes('network') || msg.includes('connection')) {
-      return new AgentError({
-        message: error.message,
-        type: 'network_error',
-        step,
-        cause: error,
-      })
+
+    if (error.cause instanceof Error) {
+      const causeError = error.cause
+      if (causeError.name === 'TypeError' && causeError.message.includes('fetch')) {
+        return new AgentError({
+          message: error.message,
+          type: 'network_error',
+          step,
+          cause: error,
+        })
+      }
     }
-    if (msg.includes('json') || msg.includes('schema')) {
-      return new AgentError({
-        message: error.message,
-        type: 'schema_error',
-        step,
-        cause: error,
-      })
-    }
-    // 其他情况默认归类为 model_error
+
     return new AgentError({
       message: error.message,
       type: 'model_error',
@@ -82,7 +68,6 @@ export function classifyError(error: unknown, step?: number): AgentError {
     })
   }
 
-  // 兜底：未知错误
   return new AgentError({
     message: String(error),
     type: 'model_error',
