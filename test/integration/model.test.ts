@@ -1,5 +1,5 @@
 import { DEEPSEEK_API_BASE_URL } from '@/constants'
-import { DeepSeekModel, resolveConfig } from '@/model'
+import { createModel, DeepSeekModel, resolveConfig } from '@/model'
 import { createMockChatCompletion, createMockToolCallCompletion, createTextChunks, createToolCallChunks, MOCK_API_KEY, mockBalance, mockChatCompletion, mockFetchStream, mockFIM, mockListModels } from '../helpers'
 
 describe('deepSeekModel', () => {
@@ -172,13 +172,46 @@ describe('deepSeekModel', () => {
       expect(newModel.config.model).toBe('deepseek-v4-pro')
       expect(newModel).not.toBe(model)
     })
+
+    it('switches model via withConfig', () => {
+      const model = createModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      const flashModel = model.withConfig({ model: 'deepseek-v4-flash' })
+
+      expect(flashModel.config.model).toBe('deepseek-v4-flash')
+      expect(flashModel.config.apiKey).toBe(MOCK_API_KEY)
+      expect(flashModel).not.toBe(model)
+    })
   })
 
-  describe('static methods', () => {
+  describe('createModel', () => {
+    it('creates a DeepSeekModel instance with required model', () => {
+      const model = createModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+
+      expect(model).toBeInstanceOf(DeepSeekModel)
+      expect(model.config.model).toBe('deepseek-v4-pro')
+      expect(model.config.apiKey).toBe(MOCK_API_KEY)
+    })
+
+    it('creates model with additional options', () => {
+      const model = createModel({
+        apiKey: MOCK_API_KEY,
+        model: 'deepseek-v4-flash',
+        temperature: 0.7,
+        thinking: { type: 'disabled' },
+      })
+
+      expect(model.config.model).toBe('deepseek-v4-flash')
+      expect(model.config.temperature).toBe(0.7)
+      expect(model.config.thinking.type).toBe('disabled')
+    })
+  })
+
+  describe('instance methods: list & balance', () => {
     it('listModels returns model list', async () => {
       mockListModels()
 
-      const result = await DeepSeekModel.list({ apiKey: MOCK_API_KEY })
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      const result = await model.list()
       expect(result.object).toBe('list')
       expect(result.data.length).toBeGreaterThanOrEqual(2)
     })
@@ -186,7 +219,8 @@ describe('deepSeekModel', () => {
     it('balance returns balance info', async () => {
       mockBalance()
 
-      const result = await DeepSeekModel.balance({ apiKey: MOCK_API_KEY })
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      const result = await model.balance()
       expect(result.is_available).toBe(true)
       expect(result.balance_infos.length).toBeGreaterThan(0)
     })

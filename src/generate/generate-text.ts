@@ -26,20 +26,11 @@ const textStepInvoker: StepInvoker = async function* (model, params) {
   } as StepResult
 }
 
-interface GenerateTextParamsWithOutput<T extends z.ZodTypeAny> extends GenerateTextParams<T> {
-  output: { schema: T }
-}
+type OutputSchema<T> = T extends { output: { schema: infer S extends z.ZodTypeAny } } ? z.infer<S> : undefined
 
-interface GenerateTextParamsWithoutOutput extends GenerateTextParams<z.ZodTypeAny> {
-  output?: never
-}
-
-export async function generateText<T extends z.ZodTypeAny>(
-  params: GenerateTextParamsWithOutput<T>,
-): Promise<GenerateTextResult<z.infer<T>>>
-export async function generateText(
-  params: GenerateTextParamsWithoutOutput,
-): Promise<GenerateTextResult<undefined>>
+export async function generateText<T extends GenerateTextParams<z.ZodTypeAny>>(
+  params: T,
+): Promise<GenerateTextResult<OutputSchema<T>>>
 export async function generateText<T extends z.ZodTypeAny>(params: GenerateTextParams<T>): Promise<GenerateTextResult<unknown>> {
   const gen = agentLoop(params, textStepInvoker)
   let iterResult = await gen.next()

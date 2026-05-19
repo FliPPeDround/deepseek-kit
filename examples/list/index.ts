@@ -1,6 +1,8 @@
 /* eslint-disable no-console */
-import { DeepSeekModel } from 'deepseek-kit'
+import { createModel } from 'deepseek-kit'
 
-const list = await DeepSeekModel.list()
+const model = createModel({ model: 'deepseek-v4-flash' })
+
+const list = await model.list()
 
 console.log(list)

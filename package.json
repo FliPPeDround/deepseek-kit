@@ -1,7 +1,7 @@
 {
   "name": "deepseek-kit",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "packageManager": "pnpm@10.33.1",
   "description": "Agents framework for Deepseek",
   "author": "FliPPeDround <flippedround@qq.com>",
@@ -13,7 +13,14 @@
     "url": "git+https://github.com/flippedround/deepseek-kit.git"
   },
   "bugs": "https://github.com/flippedround/deepseek-kit/issues",
-  "keywords": [],
+  "keywords": [
+    "deepseek",
+    "ai",
+    "agent",
+    "llm",
+    "typescript",
+    "sdk"
+  ],
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
@@ -23,6 +30,9 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",

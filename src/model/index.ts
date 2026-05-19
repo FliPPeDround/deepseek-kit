@@ -1,6 +1,6 @@
 import type { GetBalanceOptions } from './balance'
 import type { ListModelsOptions } from './list'
-import type { InvokeParams, Model, ModelOptions, ResolvedModelOptions } from './types'
+import type { InvokeParams, ModelOptions, ResolvedModelOptions } from './types'
 import type { FIMParams } from '@/fim/types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
@@ -42,12 +42,12 @@ export class DeepSeekModel {
     return new DeepSeekModel(toMerged(this._config, options) as ModelOptions)
   }
 
-  public static list(options?: ListModelsOptions) {
-    return listModels(options)
+  public list(options?: Partial<ListModelsOptions>) {
+    return listModels({ ...this._config, ...options })
   }
 
-  public static balance(options?: GetBalanceOptions) {
-    return getBalance(options)
+  public balance(options?: Partial<GetBalanceOptions>) {
+    return getBalance({ ...this._config, ...options })
   }
 }
 
@@ -75,9 +75,6 @@ export function resolveConfig(options: ModelOptions): ResolvedModelOptions {
   return resolved
 }
 
-export function createModel(options?: ModelOptions) {
-  return (model?: Model) => new DeepSeekModel({
-    ...options,
-    model: model || options?.model,
-  })
+export function createModel(options: ModelOptions): DeepSeekModel {
+  return new DeepSeekModel(options)
 }

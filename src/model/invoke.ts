@@ -1,11 +1,11 @@
 import type { ChatCompletion, ChatCompletionChunk, InvokeParams, ModelOptions } from './types'
 import type { Tool } from '@/tool'
+import { omitBy } from 'es-toolkit'
 import { getChatEndpoint } from '@/client/endpoints'
 import { apiRequest } from '@/client/request'
 import { withRetry } from '@/client/retry'
 import { apiStreamRequest } from '@/client/stream-request'
 import { buildToolParameters } from '@/tool'
-import { compact } from '@/utils'
 
 function requiresBetaEndpoint(tools: Tool[]) {
   return tools.some(tool => tool.strict)
@@ -23,13 +23,13 @@ function buildRequestBody(config: ModelOptions, params: InvokeParams) {
   const { toolParameters, toolChoice } = buildToolParameters(tools)
 
   const thinking = config.thinking
-    ? compact({
+    ? omitBy({
         type: config.thinking.type,
         reasoning_effort: config.reasoningEffort,
-      })
+      }, v => v === undefined)
     : undefined
 
-  return compact({
+  return omitBy({
     messages,
     model: config.model,
     user_id: config.userId,
@@ -43,7 +43,7 @@ function buildRequestBody(config: ModelOptions, params: InvokeParams) {
     tools: toolParameters,
     tool_choice: toolChoice,
     response_format,
-  })
+  }, v => v === undefined)
 }
 
 export async function invoke(config: ModelOptions, params: InvokeParams): Promise<ChatCompletion> {

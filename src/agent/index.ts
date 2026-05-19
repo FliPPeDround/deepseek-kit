@@ -4,25 +4,21 @@ import type { GenerateStreamParams, GenerateTextParams, GenerateTextResult } fro
 import { generateStream } from '@/generate/generate-stream'
 import { generateText } from '@/generate/generate-text'
 
-interface AgentOptionsWithOutput<T extends z.ZodTypeAny> extends AgentOptions<T> {
-  output: { schema: T }
-}
+type OutputSchema<T> = T extends { output: { schema: infer S extends z.ZodTypeAny } } ? z.infer<S> : undefined
 
-interface AgentOptionsWithoutOutput extends AgentOptions<z.ZodTypeAny> {
-  output?: never
-}
+type AgentGenerateFn<T extends AgentOptions<z.ZodTypeAny>>
+  = (params: Pick<GenerateTextParams<z.ZodTypeAny>, 'messages'>) => Promise<GenerateTextResult<OutputSchema<T>>>
 
-export function createAgent<T extends z.ZodTypeAny>(config: AgentOptionsWithOutput<T>): {
-  generate: (params: Pick<GenerateTextParams<T>, 'messages'>) => Promise<GenerateTextResult<z.infer<T>>>
-  stream: (params: Pick<GenerateStreamParams<T>, 'messages'>) => AsyncGenerator<import('@/generate/types').StreamEvent>
+type AgentStreamFn<_T extends AgentOptions<z.ZodTypeAny>>
+  = (params: Pick<GenerateStreamParams<z.ZodTypeAny>, 'messages'>) => AsyncGenerator<import('@/generate/types').StreamEvent>
+
+export function createAgent<T extends AgentOptions<z.ZodTypeAny>>(config: T): {
+  generate: AgentGenerateFn<T>
+  stream: AgentStreamFn<T>
 }
-export function createAgent(config: AgentOptionsWithoutOutput): {
-  generate: (params: Pick<GenerateTextParams<z.ZodTypeAny>, 'messages'>) => Promise<GenerateTextResult<undefined>>
-  stream: (params: Pick<GenerateStreamParams<z.ZodTypeAny>, 'messages'>) => AsyncGenerator<import('@/generate/types').StreamEvent>
-}
-export function createAgent<T extends z.ZodTypeAny>(config: AgentOptions<T>) {
+export function createAgent<T extends AgentOptions<z.ZodTypeAny>>(config: T) {
   return {
-    generate: (params: Pick<GenerateTextParams<T>, 'messages'>) => generateText({ ...config, ...params } as any),
-    stream: (params: Pick<GenerateStreamParams<T>, 'messages'>) => generateStream({ ...config, ...params } as any),
+    generate: (params: Pick<GenerateTextParams<z.ZodTypeAny>, 'messages'>) => generateText({ ...config, ...params }),
+    stream: (params: Pick<GenerateStreamParams<z.ZodTypeAny>, 'messages'>) => generateStream({ ...config, ...params }),
   }
 }

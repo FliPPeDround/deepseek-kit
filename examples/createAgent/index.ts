@@ -3,7 +3,7 @@ import { createAgent, createModel, tool } from 'deepseek-kit'
 import { z } from 'zod'
 
 const model = createModel({
-  model: 'deepseek-v4-pro',
+  model: 'deepseek-v4-flash',
 })
 
 const weatherTool = tool({
@@ -26,7 +26,7 @@ const weatherTool = tool({
 })
 
 const agent = createAgent({
-  model: model('deepseek-v4-flash'),
+  model,
   tools: [weatherTool],
   output: {
     schema: z.object({

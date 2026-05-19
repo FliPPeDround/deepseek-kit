@@ -1,0 +1,17 @@
+{
+  "name": "@example/stream",
+  "type": "module",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.33.1",
+  "description": "Stream example using the DeepSeek Kit",
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.ts"
+  },
+  "dependencies": {
+    "deepseek-kit": "workspace:*"
+  }
+}

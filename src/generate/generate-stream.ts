@@ -102,4 +102,5 @@ export async function* generateStream<T extends z.ZodTypeAny>(params: GenerateTe
     yield iterResult.value
     iterResult = await gen.next()
   }
+  yield { type: 'finish', text: iterResult.value.text, usage: iterResult.value.usage }
 }

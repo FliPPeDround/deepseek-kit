@@ -162,6 +162,12 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  examples/stream:
+    dependencies:
+      deepseek-kit:
+        specifier: workspace:*
+        version: link:../..
+
 packages:
 
   '@antfu/eslint-config@8.2.0':

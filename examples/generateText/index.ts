@@ -2,7 +2,8 @@
 import { createModel, generateText, tool } from 'deepseek-kit'
 import { z } from 'zod'
 
-const deepSeek = createModel({
+const model = createModel({
+  model: 'deepseek-v4-flash',
   thinking: {
     type: 'disabled',
   },
@@ -27,7 +28,7 @@ const weatherSchema = z.object({
 })
 
 const output = await generateText({
-  model: deepSeek('deepseek-v4-flash'),
+  model,
   tools: [weatherTool],
   messages: [
     {
@@ -60,7 +61,7 @@ const output = await generateText({
 console.log(output.output)
 
 const textResult = await generateText({
-  model: deepSeek('deepseek-v4-flash'),
+  model,
   messages: [
     {
       role: 'user',
@@ -69,4 +70,4 @@ const textResult = await generateText({
   ],
 })
 
-console.log(textResult.text)
+console.log(textResult.text, textResult.output)
