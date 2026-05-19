@@ -16,5 +16,7 @@
     "verbatimModuleSyntax": true,
     "skipDefaultLibCheck": true,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src", "test"],
+  "exclude": ["examples", "dist", "node_modules"]
 }
