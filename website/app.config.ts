@@ -1,8 +1,9 @@
 export default defineAppConfig({
   shadcnDocs: {
     site: {
-      name: 'deepseek-kit',
-      description: 'A TypeScript Agent framework based on the DeepSeek API.',
+      name: 'Deepseek Kit',
+      ogImageComponent: 'ShadcnDocs',
+      description: 'A lightweight Agent framework with native-level DeepSeek adaptation. Precise tool calling in thinking mode · Reliable structured output · Maximum cache hit rate.',
     },
     theme: {
       customizable: false,
@@ -10,7 +11,7 @@ export default defineAppConfig({
       radius: 0.5,
     },
     header: {
-      title: 'deepseek-kit',
+      title: 'DeepSeek Kit',
       showTitle: true,
       darkModeToggle: true,
       languageSwitcher: {

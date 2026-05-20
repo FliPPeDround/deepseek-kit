@@ -1,9 +1,8 @@
-import { defineNuxtConfig } from 'nuxt/config'
-
 export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n'],
   extends: ['shadcn-docs-nuxt'],
+
   i18n: {
     defaultLocale: 'en',
     locales: [
@@ -20,4 +19,7 @@ export default defineNuxtConfig({
     ],
   },
   compatibilityDate: '2024-07-06',
+  ogImage: {
+    zeroRuntime: true,
+  },
 })

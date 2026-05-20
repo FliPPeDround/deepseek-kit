@@ -13,10 +13,6 @@ announcement:
 actions:
   - name: 开始使用
     to: /zh/getting-started/installation
-  - name: API 参考
-    leftIcon: 'lucide:book-open'
-    variant: outline
-    to: /zh/core/models
   - name: GitHub
     variant: outline
     to: https://github.com/flippedround/deepseek-kit
