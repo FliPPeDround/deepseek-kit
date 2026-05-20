@@ -12,7 +12,10 @@ packages:
   - packages/*
   - examples/*
   - website
-catalog:
+
+overrides:
+  nuxt-og-image: 6.5.1
+
 catalogs:
   cli:
     '@antfu/eslint-config': ^8.2.0

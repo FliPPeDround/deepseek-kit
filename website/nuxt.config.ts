@@ -22,4 +22,9 @@ export default defineNuxtConfig({
   ogImage: {
     zeroRuntime: true,
   },
+  nitro: {
+    prerender: {
+      failOnError: false,
+    },
+  },
 })

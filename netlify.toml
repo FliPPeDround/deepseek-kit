@@ -1,5 +1,5 @@
 [build]
-publish = "dist"
+publish = "website/.output/public"
 command = "pnpm run docs:build"
 
 [build.environment]
