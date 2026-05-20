@@ -9,5 +9,6 @@ export default antfu(
       'ts/explicit-function-return-type': 'off',
       'antfu/no-top-level-await': 'off',
     },
+    ignores: ['website/content/**'],
   },
 )

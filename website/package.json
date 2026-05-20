@@ -1,0 +1,22 @@
+{
+  "name": "website",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "nuxt": "catalog:website",
+    "shadcn-docs-nuxt": "catalog:website",
+    "vue": "catalog:website",
+    "vue-router": "catalog:website"
+  },
+  "devDependencies": {
+    "@iconify-json/hugeicons": "catalog:iconify",
+    "@iconify-json/lucide": "catalog:iconify"
+  }
+}

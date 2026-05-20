@@ -6,133 +6,62 @@
 [![JSDocs][jsdocs-src]][jsdocs-href]
 [![License][license-src]][license-href]
 
-Agents framework for DeepSeek — A TypeScript Agent framework based on the DeepSeek API, providing text generation, streaming output, tool calling, structured output, and FIM completion.
+A lightweight Agent framework with native-level DeepSeek adaptation — Precise tool calling in thinking mode · Reliable structured output · Maximum cache hit rate.
 
-**[中文文档](./README.zh-CN.md)**
+**[中文文档](./README.zh-CN.md)** · **[Documentation](https://deepseek-kit.vercel.app)**
+
+---
+
+## Why deepseek-kit?
+
+LangChain.js and AI SDK are excellent general-purpose frameworks, but DeepSeek's API has unique mechanisms that they cannot properly handle. deepseek-kit is built from the ground up to solve these problems.
+
+### 🧠 Precise Tool Calling in Thinking Mode
+
+DeepSeek's thinking mode outputs a chain of thought (`reasoning_content`) before the final answer. When the model makes tool calls during thinking, **all subsequent requests must include the full `reasoning_content`** — otherwise the API returns a 400 error.
+
+General-purpose frameworks cannot distinguish between the different handling requirements for `reasoning_content` in "with tool call" vs "without tool call" scenarios, causing multi-turn tool calling to fail frequently.
+
+**deepseek-kit** automatically tracks and re-sends `reasoning_content` in the agent loop, applies differentiated strategies based on whether tool calls occurred, and enables thinking mode by default — zero configuration needed.
+
+### 💾 Maximum Cache Hit Rate
+
+DeepSeek API enables context hard disk caching by default. When subsequent requests have a **prefix that exactly matches** a previous request, the repeated portion is served from cache, significantly reducing latency and cost.
+
+General-purpose frameworks often inject dynamic metadata (timestamps, request IDs) or arrange messages in non-deterministic order, breaking prefix consistency and causing cache hit rates to plummet.
+
+**deepseek-kit** sends zero-redundancy request bodies with deterministic message construction, ensuring the same input always produces the same request prefix. Cache hit rates are fully observable via `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens`.
+
+### 📋 Reliable Structured Output
+
+Structured output is essential for agent applications, but under DeepSeek's thinking mode, general-purpose frameworks' structured output solutions often conflict with `reasoning_content` management, resulting in unreliable output formats.
+
+**deepseek-kit** provides Zod Schema-driven structured output with smart retry and formatted error feedback, fully compatible with thinking mode — the chain-of-thought context is never lost during formatting steps.
+
+---
 
 ## Features
 
-- 🤖 **Agent System** — Create intelligent agents with tool calling capabilities
-- 💬 **Text Generation** — Supports both standard and streaming generation modes
-- 🔧 **Tool Calling** — Built-in tool definitions, parameter validation, timeout and retry
-- 📋 **Structured Output** — JSON structured output based on Zod Schema
+- 🧠 **Thinking Mode Adaptation** — Automatic `reasoning_content` management, zero-config tool calling chains
+- 💾 **Cache Hit Rate Optimization** — Zero-redundancy request body + deterministic message construction
+- 📋 **Structured Output** — Zod Schema-driven, smart retry, thinking mode compatible
+- 🤖 **Agent System** — Build intelligent agents with tool calling and multi-step execution
+- 🌿 **Subagents** — Encapsulate agents as tools for delegation, with isolated context and parallel execution
+- 💬 **Streaming** — Streaming events for text, chain-of-thought, and tool calls
+- 🔧 **Tool Calling** — Built-in tool definition, parameter validation, timeout, and retry
 - ✍️ **FIM Completion** — Fill-in-the-Middle code completion support
 - 🪝 **Hook System** — Insert custom logic before and after generation steps
-- 🔄 **Auto Retry** — Intelligent retry strategy with exponential backoff and jitter
+- 🔄 **Auto Retry** — Smart retry strategy with exponential backoff and jitter
 - 🌲 **Tree-shakable** — Pure ESM, `sideEffects: false`
 - 🔒 **Type Safe** — Complete TypeScript type definitions
 
-## Installation
-
-```bash
-# pnpm
-pnpm add deepseek-kit
-
-# npm
-npm install deepseek-kit
-
-# yarn
-yarn add deepseek-kit
-```
-
-> **Requirements**: Node.js >= 18.0.0
+---
 
 ## Quick Start
 
-### Configure API Key
-
-Create a `.env` file in your project root:
-
+```bash
+pnpm add deepseek-kit
 ```
-DEEPSEEK_API_KEY=your_api_key
-```
-
-### Text Generation
-
-```ts
-import { createModel, generateText } from 'deepseek-kit'
-
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-const result = await generateText({
-  model,
-  messages: [{ role: 'user', content: 'Hello, how are you?' }],
-})
-
-console.log(result.text)
-```
-
-### Streaming Generation
-
-```ts
-import { createModel, generateStream } from 'deepseek-kit'
-
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-for await (const event of generateStream({
-  model,
-  messages: [{ role: 'user', content: 'Tell me a story' }],
-})) {
-  if (event.type === 'text-delta') {
-    process.stdout.write(event.textDelta)
-  }
-}
-```
-
-### Tool Calling
-
-```ts
-import { createModel, generateText, tool } from 'deepseek-kit'
-import { z } from 'zod'
-
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-const weatherTool = tool({
-  name: 'weather',
-  description: 'Get weather information for a city',
-  schema: z.object({
-    city: z.string().describe('The city to get weather for'),
-  }),
-  execute: async (input) => {
-    return `Weather in ${input.city}: Sunny, 25°C`
-  },
-  timeout: 10000,
-  retries: 2,
-})
-
-const result = await generateText({
-  model,
-  tools: [weatherTool],
-  messages: [{ role: 'user', content: 'What is the weather in Beijing?' }],
-})
-
-console.log(result.text)
-```
-
-### Structured Output
-
-```ts
-import { createModel, generateText } from 'deepseek-kit'
-import { z } from 'zod'
-
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-const result = await generateText({
-  model,
-  messages: [{ role: 'user', content: 'What is the weather in Beijing?' }],
-  output: {
-    schema: z.object({
-      city: z.string(),
-      weather: z.string(),
-      temperature: z.number(),
-    }),
-  },
-})
-
-console.log(result.output) // { city: 'Beijing', weather: 'Sunny', temperature: 25 }
-```
-
-### Create Agent
 
 ```ts
 import { createAgent, createModel, tool } from 'deepseek-kit'
@@ -140,142 +69,29 @@ import { z } from 'zod'
 
 const model = createModel({ model: 'deepseek-v4-flash' })
 
-const agent = createAgent({
-  model,
-  tools: [weatherTool],
-  output: {
-    schema: z.object({
-      city: z.string(),
-      weather: z.string(),
-    }),
-  },
+const weatherTool = tool({
+  name: 'get_weather',
+  description: 'Get weather information for a city',
+  parameters: z.object({
+    city: z.string().describe('City name'),
+  }),
+  execute: async ({ city }) => `${city}: Sunny, 25°C`,
 })
+
+const agent = createAgent({ model, tools: [weatherTool] })
 
 const result = await agent.generate({
-  messages: [{ role: 'user', content: 'What is the weather in Beijing?' }],
-})
-
-console.log(result.output)
-```
-
-### FIM Completion
-
-```ts
-import { createModel, fim } from 'deepseek-kit'
-
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-const result = await fim({
-  model,
-  prompt: 'function fib(a)',
-  suffix: 'return fib(a-1) + fib(a-2)',
+  prompt: 'How\'s the weather in Chongqing today?',
 })
 
 console.log(result.text)
 ```
 
-### Hook System
+> **Requirements**: Node.js >= 18.0.0, DeepSeek API key
 
-```ts
-import { createModel, generateText } from 'deepseek-kit'
+📖 For the full guide, visit the [documentation](https://deepseek-kit.vercel.app).
 
-const model = createModel({ model: 'deepseek-v4-flash' })
-
-const result = await generateText({
-  model,
-  messages: [{ role: 'user', content: 'Hello' }],
-  hooks: {
-    beforeStep: (context, hookCtx) => {
-      console.log(`Step ${context.step}`)
-      return {
-        messages: context.messages,
-        config: { temperature: 0.7 },
-      }
-    },
-    afterStep: (step, hookCtx) => {
-      console.log(`Step ${step.step} finished: ${step.type}`)
-    },
-    onError: (error, hookCtx) => {
-      console.error(`Error at step ${error.step}: ${error.message}`)
-      return error
-    },
-  },
-})
-```
-
-## API Reference
-
-### `createModel(options: ModelOptions & { model: Model })`
-
-Creates a `DeepSeekModel` instance directly.
-
-```ts
-const model = createModel({
-  model: 'deepseek-v4-flash',
-  apiKey: 'your-api-key',
-  baseURL: 'https://api.deepseek.com',
-  thinking: { type: 'enabled' },
-  temperature: 0.7,
-  maxTokens: 4096,
-})
-
-const proModel = model.withConfig({ model: 'deepseek-v4-pro' })
-```
-
-### `DeepSeekModel`
-
-| Method | Description |
-|--------|-------------|
-| `invoke(params)` | Send chat completion request |
-| `invokeStream(params)` | Streaming chat completion |
-| `fim(params)` | FIM code completion |
-| `list()` | Get available models list |
-| `balance()` | Query account balance |
-| `withConfig(options)` | Create new instance with merged config, can be used to switch models |
-
-### `generateText(params)`
-
-Generate text with support for tool calling and structured output. Returns `Promise<GenerateTextResult>`.
-
-### `generateStream(params)`
-
-Stream text generation, returns `AsyncGenerator<StreamEvent>`.
-
-StreamEvent types:
-- `text-delta` — Text delta
-- `reasoning-delta` — Reasoning delta
-- `tool-call` — Tool call
-- `step` — Step start
-- `finish` — Generation complete
-
-### `createAgent(config)`
-
-Create an Agent, returns `{ generate, stream }` methods.
-
-### `tool(config)`
-
-Define a tool with parameter validation, timeout and retry support.
-
-```ts
-const myTool = tool({
-  name: 'my_tool',
-  description: 'Tool description',
-  schema: z.object({ key: z.string() }),
-  execute: async args => args.key,
-  strict: true,
-  required: true,
-  timeout: 60000,
-  retries: 0,
-})
-```
-
-### `fim(params)`
-
-Fill-in-the-Middle code completion.
-
-## Contributing
-
-Please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
+---
 
 ## 🙇🏻‍♂️ Sponsors
 

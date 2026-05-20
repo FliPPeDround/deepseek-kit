@@ -41,7 +41,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
   tools?: Tool[]
   system?: string
-  messages: ChatMessage[]
+  messages?: ChatMessage[]
   maxSteps?: number
   prompt?: string
   output?: {
