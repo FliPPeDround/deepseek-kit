@@ -1,3 +1,5 @@
+<img src="logo.png" align="right" width="42" alt="logo"/>
+
 # deepseek-kit
 
 [![npm version][npm-version-src]][npm-version-href]

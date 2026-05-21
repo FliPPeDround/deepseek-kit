@@ -20,8 +20,8 @@ export default defineAppConfig({
         dropdownType: 'select',
       },
       logo: {
-        light: '/logo.svg',
-        dark: '/logo-dark.svg',
+        light: '/logo.png',
+        dark: '/logo-dark.png',
       },
       links: [{
         icon: 'lucide:github',
