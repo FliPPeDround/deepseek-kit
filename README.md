@@ -10,7 +10,7 @@
 
 A lightweight Agent framework with native-level DeepSeek adaptation — Precise tool calling in thinking mode · Reliable structured output · Maximum cache hit rate.
 
-**[中文文档](./README.zh-CN.md)** · **[Documentation](https://deepseek-kit.vercel.app)**
+**[中文文档](./README.zh-CN.md)** · **[Documentation](https://deepseek-kit.netlify.app)**
 
 ---
 
@@ -91,7 +91,7 @@ console.log(result.text)
 
 > **Requirements**: Node.js >= 18.0.0, DeepSeek API key
 
-📖 For the full guide, visit the [documentation](https://deepseek-kit.vercel.app).
+📖 For the full guide, visit the [documentation](https://deepseek-kit.netlify.app).
 
 ---
 
