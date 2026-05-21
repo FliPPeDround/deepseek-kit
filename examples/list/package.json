@@ -2,6 +2,7 @@
   "name": "@example/list",
   "type": "module",
   "version": "1.0.0",
+  "private": true,
   "packageManager": "pnpm@10.33.1",
   "description": "List example using the DeepSeek Kit",
   "author": "",

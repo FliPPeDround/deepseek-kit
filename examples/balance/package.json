@@ -2,6 +2,7 @@
   "name": "@example/balance",
   "type": "module",
   "version": "1.0.0",
+  "private": true,
   "packageManager": "pnpm@10.33.1",
   "description": "Balance example using the DeepSeek Kit",
   "author": "",
