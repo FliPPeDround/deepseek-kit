@@ -1,4 +1,4 @@
-<img src="logo.png" align="right" width="42" alt="logo"/>
+<img src="logo.png" align="right" width="77" alt="logo"/>
 
 # deepseek-kit
 
