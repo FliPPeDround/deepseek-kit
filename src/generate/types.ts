@@ -42,6 +42,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   tools?: Tool[]
   system?: string
   messages?: ChatMessage[]
+  fewShot?: ChatMessage[]
   maxSteps?: number
   prompt?: string
   output?: {

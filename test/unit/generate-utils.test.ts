@@ -38,6 +38,49 @@ describe('buildMessage', () => {
       { role: 'user', content: 'New' },
     ])
   })
+
+  it('inserts fewShot messages after system and before messages', () => {
+    const fewShot = [
+      { role: 'user' as const, content: 'Example question' },
+      { role: 'assistant' as const, content: 'Example answer' },
+    ]
+    const messages = [{ role: 'user' as const, content: 'Previous' }]
+    const result = buildMessage('New', 'System', messages, fewShot)
+    expect(result).toEqual([
+      { role: 'system', content: 'System' },
+      { role: 'user', content: 'Example question' },
+      { role: 'assistant', content: 'Example answer' },
+      { role: 'user', content: 'Previous' },
+      { role: 'user', content: 'New' },
+    ])
+  })
+
+  it('inserts fewShot messages after system when no messages', () => {
+    const fewShot = [
+      { role: 'user' as const, content: 'Q' },
+      { role: 'assistant' as const, content: 'A' },
+    ]
+    const result = buildMessage('Hello', 'System', undefined, fewShot)
+    expect(result).toEqual([
+      { role: 'system', content: 'System' },
+      { role: 'user', content: 'Q' },
+      { role: 'assistant', content: 'A' },
+      { role: 'user', content: 'Hello' },
+    ])
+  })
+
+  it('inserts fewShot before prompt when no system or messages', () => {
+    const fewShot = [
+      { role: 'user' as const, content: 'Q' },
+      { role: 'assistant' as const, content: 'A' },
+    ]
+    const result = buildMessage('Hello', undefined, undefined, fewShot)
+    expect(result).toEqual([
+      { role: 'user', content: 'Q' },
+      { role: 'assistant', content: 'A' },
+      { role: 'user', content: 'Hello' },
+    ])
+  })
 })
 
 describe('emptyUsage', () => {

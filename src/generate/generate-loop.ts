@@ -28,8 +28,8 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
   params: GenerateTextParams<T>,
   stepInvoker: StepInvoker,
 ): AsyncGenerator<StreamEvent, GenerateTextResult<unknown>> {
-  const { model, tools, system, messages, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal } = params
-  const currentMessages: ChatMessage[] = buildMessage(prompt, system, messages)
+  const { model, tools, system, messages, fewShot, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal } = params
+  const currentMessages: ChatMessage[] = buildMessage(prompt, system, messages, fewShot)
   const currentTools: Tool[] = tools ? [...tools] : []
   const totalUsage: Usage = emptyUsage()
   const runner = new HookRunner()

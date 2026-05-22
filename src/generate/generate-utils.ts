@@ -29,13 +29,16 @@ export function mergeUsage(target: Usage, source: Usage): void {
   target.completion_tokens_details.reasoning_tokens += source.completion_tokens_details?.reasoning_tokens ?? 0
 }
 
-export function buildMessage(prompt?: string, system?: string, messages?: ChatMessage[]): ChatMessage[] {
+export function buildMessage(prompt?: string, system?: string, messages?: ChatMessage[], fewShot?: ChatMessage[]): ChatMessage[] {
   if (!prompt && !system && !messages) {
     throw new Error('prompt is required')
   }
   const message: ChatMessage[] = []
   if (system) {
     message.push({ role: 'system', content: system })
+  }
+  if (fewShot) {
+    message.push(...fewShot)
   }
   if (messages) {
     message.push(...messages)
