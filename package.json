@@ -54,6 +54,7 @@
   },
   "dependencies": {
     "dotenv": "catalog:env",
+    "jsonrepair": "catalog:schema",
     "zod": "catalog:schema"
   },
   "devDependencies": {

@@ -1,11 +1,11 @@
 import type { GenerateTextHooks, HookContext, StepEvent, StepRef } from './types'
 import type { DeepSeekModel } from '@/model'
-import type { ChatMessage } from '@/model/types'
+import type { AssistantMessage, ChatMessage } from '@/model/types'
 import type { Tool } from '@/tool'
 import { z } from 'zod'
 import { AgentError, classifyError } from '@/errors'
+import { formatParseError, parseAndValidate } from '@/utils/json-parse'
 import { HookRunner, StopLoop } from './generate-utils'
-import { formatZodErrors } from './zod-error-formatter'
 
 export interface StructuredOutputParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
@@ -87,34 +87,16 @@ export async function generateStructuredOutput<T extends z.ZodTypeAny>(
       if (runner.stopped) {
         throw new StopLoop()
       }
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(lastResponseText)
-      }
-      catch {
-        currentMessages.push({
-          role: 'assistant',
-          content: lastResponseText,
-        })
-        currentMessages.push({
-          role: 'user',
-          content: 'Your previous output is not valid JSON. Please output only a valid JSON object without any extra text or formatting.',
-        })
-        continue
-      }
 
-      const result = schema.safeParse(parsed)
+      const result = await parseAndValidate(lastResponseText, schema)
 
       if (result.success) {
         return result.data as z.infer<T>
       }
 
-      const errorFeedback = formatZodErrors(result.error)
+      const errorFeedback = formatParseError(result)
 
-      currentMessages.push({
-        role: 'assistant',
-        content: lastResponseText,
-      })
+      currentMessages.push(message as AssistantMessage)
       currentMessages.push({
         role: 'user',
         content: errorFeedback,

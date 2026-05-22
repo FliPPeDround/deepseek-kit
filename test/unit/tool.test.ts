@@ -60,7 +60,7 @@ describe('tool', () => {
     expect(parsed.error).toContain('Invalid arguments')
   })
 
-  it('returns error for non-JSON arguments', async () => {
+  it('returns schema error for repairable-but-invalid JSON arguments', async () => {
     const t = tool({
       name: 'get_weather',
       description: 'Get weather',
@@ -69,6 +69,20 @@ describe('tool', () => {
     })
 
     const result = await t.execute('not json')
+    const parsed = JSON.parse(result)
+    expect(parsed.success).toBe(false)
+    expect(parsed.error).toContain('Invalid arguments')
+  })
+
+  it('returns parse error for completely unrepairable JSON', async () => {
+    const t = tool({
+      name: 'get_weather',
+      description: 'Get weather',
+      schema: weatherSchema,
+      execute: async ({ city }) => city,
+    })
+
+    const result = await t.execute('}}}}not json at all{{{')
     const parsed = JSON.parse(result)
     expect(parsed.success).toBe(false)
     expect(parsed.error).toContain('Failed to parse arguments')

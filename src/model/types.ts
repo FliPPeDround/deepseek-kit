@@ -14,15 +14,14 @@ export interface UserMessage {
   name?: string
 }
 
-export type AssistantMessage = {
+export interface AssistantMessage {
   role: 'assistant'
   content: string | null
   name?: string
   tool_calls?: ChatCompletionTool[]
-} & (
-  | { prefix: true, reasoning_content?: string }
-  | { prefix?: false | undefined, reasoning_content?: undefined }
-)
+  prefix?: boolean
+  reasoning_content?: string
+}
 
 export interface ToolMessage {
   role: 'tool'

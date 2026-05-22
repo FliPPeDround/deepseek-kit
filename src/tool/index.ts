@@ -1,5 +1,6 @@
 import type { ToolCall, ToolChoice, ToolDefinition } from './types'
 import { z } from 'zod'
+import { parseAndValidate } from '@/utils/json-parse'
 
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -69,25 +70,23 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   }
 
   const wrappedExecute = async (args: string): Promise<string> => {
-    let parsed: z.infer<T>
-    try {
-      parsed = schema.parse(JSON.parse(args))
-    }
-    catch (err) {
-      if (err instanceof z.ZodError) {
-        const messages = err.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')
+    const result = await parseAndValidate(args, schema)
+
+    if (!result.success) {
+      if (result.type === 'schema_validation_error') {
+        const messages = result.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')
         return JSON.stringify({ success: false, error: `Invalid arguments: ${messages}` })
       }
-      return JSON.stringify({ success: false, error: `Failed to parse arguments: ${err instanceof Error ? err.message : String(err)}` })
+      return JSON.stringify({ success: false, error: `Failed to parse arguments: ${result.error.message}` })
     }
 
     try {
-      const result = await withRetries(
-        async () => execute(parsed),
+      const execResult = await withRetries(
+        async () => execute(result.data),
         retries,
         timeout,
       )
-      return JSON.stringify({ success: true, data: result })
+      return JSON.stringify({ success: true, data: execResult })
     }
     catch (err) {
       return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) })

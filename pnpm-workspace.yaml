@@ -12,10 +12,9 @@ packages:
   - packages/*
   - examples/*
   - website
-
 overrides:
   nuxt-og-image: 6.5.1
-
+catalog:
 catalogs:
   cli:
     '@antfu/eslint-config': ^8.2.0
@@ -38,6 +37,7 @@ catalogs:
     '@antfu/utils': ^9.3.0
     es-toolkit: ^1.46.1
   schema:
+    jsonrepair: ^3.14.0
     zod: ^4.4.3
   testing:
     tsdown-stale-guard: ^0.1.1
