@@ -1,4 +1,5 @@
 export { createAgent } from './agent'
+export type { AgentCompactConfig } from './context/compact'
 export { AgentError, classifyError } from './errors'
 export type { AgentErrorType } from './errors'
 export { fim } from './fim'

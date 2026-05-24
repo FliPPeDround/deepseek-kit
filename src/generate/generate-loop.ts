@@ -4,6 +4,7 @@ import type { ChatMessage, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
+import { createCompactMessage } from '@/context/compact'
 import { AgentError, classifyError } from '@/errors'
 import { generateStructuredOutput } from './generate-structured-output'
 import { buildMessage, emptyUsage, HookRunner, lastAssistantMsg, mergeUsage, StopLoop } from './generate-utils'
@@ -30,18 +31,28 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
   params: GenerateTextParams<T>,
   stepInvoker: StepInvoker,
 ): AsyncGenerator<StreamEvent, GenerateTextResult<unknown>> {
-  const { model, tools, system, messages, fewShot, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal } = params
+  const { model, tools, system, messages, fewShot, maxSteps = AGENT_LOOP_MAX_STEPS, prompt, output, hooks, signal, compact } = params
   const currentMessages: ChatMessage[] = buildMessage(prompt, system, messages, fewShot)
   const currentTools: Tool[] = tools ? [...tools] : []
   const totalUsage: Usage = emptyUsage()
   const runner = new HookRunner()
   const stepRef: StepRef = { value: 0 }
+  const compactMessage = compact
+    ? createCompactMessage(typeof compact === 'object' ? compact : undefined)
+    : null
 
   let currentModel = model
+  let lastPromptTokens = 0
 
   while (stepRef.value < maxSteps) {
     stepRef.value++
     yield { type: 'step', step: stepRef.value }
+
+    if (compactMessage && compactMessage.shouldCompact(lastPromptTokens)) {
+      const compacted = await compactMessage.compact(currentMessages, signal)
+      currentMessages.length = 0
+      currentMessages.push(...compacted)
+    }
 
     currentModel = runner.runBeforeStep(hooks, stepRef.value, currentMessages, currentTools, currentModel)
 
@@ -67,6 +78,7 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
       }
 
       mergeUsage(totalUsage, stepResult.usage)
+      lastPromptTokens = stepResult.usage.prompt_tokens
 
       currentMessages.push(stepResult.assistantMessage)
 

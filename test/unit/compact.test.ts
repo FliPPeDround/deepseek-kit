@@ -1,6 +1,23 @@
+import type { ChatMessage } from '@/model/types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { CompactTool, createCompactTool } from '@/context/compact'
+import { CompactMessage, CompactTool, createCompactTool } from '@/context/compact'
 import { tool } from '@/tool'
+
+vi.mock('@/model', () => ({
+  createModel: vi.fn().mockReturnValue({
+    invoke: vi.fn().mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: 'Summary of conversation history',
+            role: 'assistant',
+          },
+        },
+      ],
+    }),
+  }),
+}))
 
 describe('compactTool', () => {
   beforeEach(() => {
@@ -151,5 +168,173 @@ describe('tool with compact', () => {
     const parsed = JSON.parse(result)
     expect(parsed.success).toBe(true)
     expect(parsed.data).toBe('a'.repeat(100))
+  })
+})
+
+describe('compactMessage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('shouldCompact', () => {
+    it('returns false when below threshold', () => {
+      const cm = new CompactMessage()
+      expect(cm.shouldCompact(849_999)).toBe(false)
+    })
+
+    it('returns true when at threshold', () => {
+      const cm = new CompactMessage()
+      expect(cm.shouldCompact(850_000)).toBe(true)
+    })
+
+    it('returns true when above threshold', () => {
+      const cm = new CompactMessage()
+      expect(cm.shouldCompact(900_000)).toBe(true)
+    })
+
+    it('uses custom threshold and contextWindowSize', () => {
+      const cm = new CompactMessage({ threshold: 0.5, contextWindowSize: 1000 })
+      expect(cm.shouldCompact(499)).toBe(false)
+      expect(cm.shouldCompact(500)).toBe(true)
+      expect(cm.shouldCompact(600)).toBe(true)
+    })
+  })
+
+  describe('constructor', () => {
+    it('uses default values', () => {
+      const cm = new CompactMessage()
+      expect((cm as any).threshold).toBe(0.85)
+      expect((cm as any).keepRecentRounds).toBe(3)
+      expect((cm as any).model).toBe('deepseek-v4-flash')
+      expect((cm as any).contextWindowSize).toBe(1_000_000)
+    })
+
+    it('applies custom config', () => {
+      const cm = new CompactMessage({
+        threshold: 0.7,
+        keepRecentRounds: 5,
+        model: 'deepseek-v4-pro',
+        contextWindowSize: 500_000,
+      })
+      expect((cm as any).threshold).toBe(0.7)
+      expect((cm as any).keepRecentRounds).toBe(5)
+      expect((cm as any).model).toBe('deepseek-v4-pro')
+      expect((cm as any).contextWindowSize).toBe(500_000)
+    })
+  })
+
+  describe('compact', () => {
+    it('returns messages as-is when no history rounds (all rounds are recent)', async () => {
+      const cm = new CompactMessage({ keepRecentRounds: 3 })
+      const messages: ChatMessage[] = [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'hi' },
+        { role: 'user', content: 'how are you' },
+        { role: 'assistant', content: 'fine' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result).toEqual(messages)
+    })
+
+    it('preserves system messages in prefix', async () => {
+      const cm = new CompactMessage({ keepRecentRounds: 1 })
+      const messages: ChatMessage[] = [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'system', content: 'Always be concise.' },
+        { role: 'user', content: 'question 1' },
+        { role: 'assistant', content: 'answer 1' },
+        { role: 'user', content: 'question 2' },
+        { role: 'assistant', content: 'answer 2' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' })
+      expect(result[1]).toEqual({ role: 'system', content: 'Always be concise.' })
+    })
+
+    it('preserves few-shot messages in prefix (including tool messages with name=few-shot)', async () => {
+      const cm = new CompactMessage({ keepRecentRounds: 1 })
+      const messages: ChatMessage[] = [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'example question', name: 'few-shot' },
+        { role: 'assistant', content: 'example answer', name: 'few-shot' },
+        { role: 'tool', content: 'example tool result', tool_call_id: 'call_1', name: 'few-shot' },
+        { role: 'user', content: 'question 1' },
+        { role: 'assistant', content: 'answer 1' },
+        { role: 'user', content: 'question 2' },
+        { role: 'assistant', content: 'answer 2' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' })
+      expect(result[1]).toEqual({ role: 'user', content: 'example question', name: 'few-shot' })
+      expect(result[2]).toEqual({ role: 'assistant', content: 'example answer', name: 'few-shot' })
+      expect(result[3]).toEqual({ role: 'tool', content: 'example tool result', tool_call_id: 'call_1', name: 'few-shot' })
+    })
+
+    it('summarizes history rounds and keeps recent rounds', async () => {
+      const cm = new CompactMessage({ keepRecentRounds: 1 })
+      const messages: ChatMessage[] = [
+        { role: 'user', content: 'question 1' },
+        { role: 'assistant', content: 'answer 1' },
+        { role: 'user', content: 'question 2' },
+        { role: 'assistant', content: 'answer 2' },
+        { role: 'user', content: 'question 3' },
+        { role: 'assistant', content: 'answer 3' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result).toHaveLength(3)
+      expect(result[0]).toEqual({
+        role: 'user',
+        name: 'compact-summary',
+        content: '[Conversation history summary]: Summary of conversation history',
+      })
+      expect(result[1]).toEqual({ role: 'user', content: 'question 3' })
+      expect(result[2]).toEqual({ role: 'assistant', content: 'answer 3' })
+    })
+
+    it('returns original messages when summarization fails', async () => {
+      const { createModel } = await import('@/model')
+      vi.mocked(createModel).mockReturnValueOnce({
+        invoke: vi.fn().mockRejectedValue(new Error('LLM error')),
+      } as any)
+      const cm = new CompactMessage({ keepRecentRounds: 1 })
+      const messages: ChatMessage[] = [
+        { role: 'user', content: 'question 1' },
+        { role: 'assistant', content: 'answer 1' },
+        { role: 'user', content: 'question 2' },
+        { role: 'assistant', content: 'answer 2' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result).toEqual(messages)
+    })
+
+    it('groups rounds by user message boundaries', async () => {
+      const cm = new CompactMessage({ keepRecentRounds: 1 })
+      const messages: ChatMessage[] = [
+        { role: 'user', content: 'question 1' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            id: 'call_1',
+            type: 'function',
+            function: { name: 'search', arguments: '{"q":"test"}' },
+          }],
+        },
+        { role: 'tool', content: 'tool result 1', tool_call_id: 'call_1' },
+        { role: 'assistant', content: 'answer 1' },
+        { role: 'user', content: 'question 2' },
+        { role: 'assistant', content: 'answer 2' },
+        { role: 'user', content: 'question 3' },
+        { role: 'assistant', content: 'answer 3' },
+      ]
+      const result = await cm.compact(messages)
+      expect(result[0]).toEqual({
+        role: 'user',
+        name: 'compact-summary',
+        content: '[Conversation history summary]: Summary of conversation history',
+      })
+      expect(result[1]).toEqual({ role: 'user', content: 'question 3' })
+      expect(result[2]).toEqual({ role: 'assistant', content: 'answer 3' })
+    })
   })
 })

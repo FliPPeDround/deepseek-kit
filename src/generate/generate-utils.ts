@@ -38,7 +38,9 @@ export function buildMessage(prompt?: string, system?: string, messages?: ChatMe
     message.push({ role: 'system', content: system })
   }
   if (fewShot) {
-    message.push(...fewShot)
+    message.push(...fewShot.map((msg) => {
+      return { ...msg, name: 'few-shot' }
+    }))
   }
   if (messages) {
     message.push(...messages)

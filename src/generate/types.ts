@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { AgentCompactConfig } from '@/context/compact'
 import type { AgentError } from '@/errors'
 import type { DeepSeekModel } from '@/model'
 import type { ChatMessage, ModelOptions, Usage } from '@/model/types'
@@ -50,6 +51,7 @@ export interface GenerateTextParams<T extends z.ZodTypeAny> {
   }
   hooks?: GenerateTextHooks
   signal?: AbortSignal
+  compact?: boolean | AgentCompactConfig
 }
 
 export interface GenerateTextResult<TOutput = undefined> {

@@ -48,8 +48,8 @@ describe('buildMessage', () => {
     const result = buildMessage('New', 'System', messages, fewShot)
     expect(result).toEqual([
       { role: 'system', content: 'System' },
-      { role: 'user', content: 'Example question' },
-      { role: 'assistant', content: 'Example answer' },
+      { role: 'user', content: 'Example question', name: 'few-shot' },
+      { role: 'assistant', content: 'Example answer', name: 'few-shot' },
       { role: 'user', content: 'Previous' },
       { role: 'user', content: 'New' },
     ])
@@ -63,8 +63,8 @@ describe('buildMessage', () => {
     const result = buildMessage('Hello', 'System', undefined, fewShot)
     expect(result).toEqual([
       { role: 'system', content: 'System' },
-      { role: 'user', content: 'Q' },
-      { role: 'assistant', content: 'A' },
+      { role: 'user', content: 'Q', name: 'few-shot' },
+      { role: 'assistant', content: 'A', name: 'few-shot' },
       { role: 'user', content: 'Hello' },
     ])
   })
@@ -76,8 +76,8 @@ describe('buildMessage', () => {
     ]
     const result = buildMessage('Hello', undefined, undefined, fewShot)
     expect(result).toEqual([
-      { role: 'user', content: 'Q' },
-      { role: 'assistant', content: 'A' },
+      { role: 'user', content: 'Q', name: 'few-shot' },
+      { role: 'assistant', content: 'A', name: 'few-shot' },
       { role: 'user', content: 'Hello' },
     ])
   })
