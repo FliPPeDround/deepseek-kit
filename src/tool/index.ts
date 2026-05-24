@@ -1,11 +1,17 @@
 import type { ToolCall, ToolChoice, ToolDefinition } from './types'
 import { z } from 'zod'
+import { createCompactTool } from '@/context/compact'
 import { parseAndValidate } from '@/utils/json-parse'
 
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<T> {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
+
   let timeoutId: NodeJS.Timeout | undefined
   const timeoutPromise = new Promise<T>((_, reject) => {
     timeoutId = setTimeout(() => {
@@ -13,13 +19,26 @@ async function withTimeout<T>(
     }, timeoutMs)
   })
 
+  let rejectAbort!: (reason: unknown) => void
+  const abortPromise = new Promise<T>((_, reject) => {
+    rejectAbort = reject
+  })
+
+  const onAbort = () => {
+    clearTimeout(timeoutId)
+    rejectAbort(new DOMException('Aborted', 'AbortError'))
+  }
+
+  signal?.addEventListener('abort', onAbort, { once: true })
+
   try {
-    return await Promise.race([promise, timeoutPromise])
+    return await Promise.race([promise, timeoutPromise, abortPromise])
   }
   finally {
     if (timeoutId) {
       clearTimeout(timeoutId)
     }
+    signal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -27,16 +46,23 @@ async function withRetries<T>(
   fn: () => Promise<T>,
   maxRetries: number,
   timeoutMs?: number,
+  signal?: AbortSignal,
 ): Promise<T> {
   let lastError: Error | undefined
   for (let i = 0; i <= maxRetries; i++) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
     try {
       if (timeoutMs) {
-        return await withTimeout(fn(), timeoutMs)
+        return await withTimeout(fn(), timeoutMs, signal)
       }
       return await fn()
     }
     catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw err
+      }
       lastError = err instanceof Error ? err : new Error(String(err))
       if (i === maxRetries) {
         throw lastError
@@ -62,14 +88,14 @@ export function serializeResult(result: unknown): string {
 }
 
 export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
-  const { schema, execute, timeout = 60000, retries = 0 } = config
+  const { schema, execute, compact, name, description, timeout = 60000, retries = 0 } = config
   const jsonSchema = z.toJSONSchema(schema)
 
   if (config.strict) {
     enforceStrictSchema(jsonSchema)
   }
 
-  const wrappedExecute = async (args: string): Promise<string> => {
+  const wrappedExecute = async (args: string, signal?: AbortSignal): Promise<string> => {
     const result = await parseAndValidate(args, schema)
 
     if (!result.success) {
@@ -85,8 +111,26 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
         async () => execute(result.data),
         retries,
         timeout,
+        signal,
       )
-      return JSON.stringify({ success: true, data: execResult })
+      let data = serializeResult(execResult)
+      if (compact) {
+        try {
+          const toolCompactConfig = typeof compact === 'object'
+            ? compact
+            : undefined
+          data = await createCompactTool(toolCompactConfig).compact(
+            data,
+            name,
+            description,
+            signal,
+          )
+        }
+        catch {
+          // compact failure should not affect the tool result
+        }
+      }
+      return JSON.stringify({ success: true, data })
     }
     catch (err) {
       return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) })
@@ -96,7 +140,7 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   return {
     ...config,
     parameters: jsonSchema,
-    execute: (args: string) => wrappedExecute(args),
+    execute: (args: string, signal?: AbortSignal) => wrappedExecute(args, signal),
   }
 }
 

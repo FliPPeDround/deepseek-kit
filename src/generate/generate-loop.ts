@@ -11,14 +11,16 @@ import { buildMessage, emptyUsage, HookRunner, lastAssistantMsg, mergeUsage, Sto
 async function executeToolCalls(
   toolCalls: ChatCompletionTool[],
   tools: Tool[],
+  signal?: AbortSignal,
 ): Promise<Array<{ tool_call_id: string, content: string }>> {
   return Promise.all(
     toolCalls.map(async (toolCall) => {
       const name = toolCall.function?.name
       const tool = tools.find(t => t.name === name)
       const result = tool
-        ? await tool.execute(toolCall.function.arguments)
+        ? await tool.execute(toolCall.function.arguments, signal)
         : `Tool execution error: Tool "${name}" not found`
+
       return { tool_call_id: toolCall.id, content: result }
     }),
   )
@@ -69,7 +71,7 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
       currentMessages.push(stepResult.assistantMessage)
 
       if (stepResult.toolCalls.length > 0 && currentTools.length > 0) {
-        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools)
+        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools, signal)
         for (const { tool_call_id, content } of toolResults) {
           currentMessages.push({ role: 'tool', content, tool_call_id })
         }

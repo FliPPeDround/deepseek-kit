@@ -156,6 +156,87 @@ describe('tool', () => {
       expect(t.parameters.additionalProperties).toBe(false)
     })
   })
+
+  describe('abortSignal', () => {
+    it('aborts tool execution via signal with timeout', async () => {
+      const controller = new AbortController()
+      const t = tool({
+        name: 'slow_tool',
+        description: 'Slow tool',
+        schema: weatherSchema,
+        timeout: 5000,
+        execute: async () => {
+          await new Promise(resolve => setTimeout(resolve, 10000))
+          return 'done'
+        },
+      })
+
+      setTimeout(() => controller.abort(), 50)
+      const result = await t.execute(JSON.stringify({ city: 'Beijing' }), controller.signal)
+      const parsed = JSON.parse(result)
+      expect(parsed.success).toBe(false)
+      expect(parsed.error).toContain('Aborted')
+    })
+
+    it('aborts tool execution via already-aborted signal', async () => {
+      const controller = new AbortController()
+      controller.abort()
+
+      const t = tool({
+        name: 'abort_tool',
+        description: 'Abort tool',
+        schema: weatherSchema,
+        timeout: 5000,
+        execute: async () => 'should not reach',
+      })
+
+      const result = await t.execute(JSON.stringify({ city: 'Beijing' }), controller.signal)
+      const parsed = JSON.parse(result)
+      expect(parsed.success).toBe(false)
+      expect(parsed.error).toContain('Aborted')
+    })
+
+    it('does not abort when signal is not triggered', async () => {
+      const controller = new AbortController()
+      const t = tool({
+        name: 'fast_tool',
+        description: 'Fast tool',
+        schema: weatherSchema,
+        timeout: 5000,
+        execute: async ({ city }) => `Weather in ${city}: sunny`,
+      })
+
+      const result = await t.execute(JSON.stringify({ city: 'Beijing' }), controller.signal)
+      const parsed = JSON.parse(result)
+      expect(parsed.success).toBe(true)
+      expect(parsed.data).toBe('Weather in Beijing: sunny')
+    })
+
+    it('abort signal stops retries', async () => {
+      let attempts = 0
+      const controller = new AbortController()
+
+      const t = tool({
+        name: 'retry_abort_tool',
+        description: 'Retry abort tool',
+        schema: weatherSchema,
+        timeout: 200,
+        retries: 5,
+        execute: async () => {
+          attempts++
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return 'done'
+        },
+      })
+
+      setTimeout(() => controller.abort(), 100)
+      const result = await t.execute(JSON.stringify({ city: 'Beijing' }), controller.signal)
+      const parsed = JSON.parse(result)
+      expect(parsed.success).toBe(false)
+      expect(parsed.error).toContain('Aborted')
+      expect(attempts).toBeLessThan(6)
+    })
+  })
 })
 
 describe('buildToolParameters', () => {

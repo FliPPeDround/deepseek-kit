@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { Model } from '@/model/types'
 
 export type ToolResult = unknown
 
@@ -18,6 +19,11 @@ export interface ToolFailure {
 
 export type ToolResultType = ToolSuccess | ToolFailure
 
+export interface ToolCompactConfig {
+  threshold?: number
+  model?: Model
+}
+
 export interface ToolDefinition<T extends z.ZodObject> {
   name: string
   description: string
@@ -27,6 +33,7 @@ export interface ToolDefinition<T extends z.ZodObject> {
   execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
   timeout?: number
   retries?: number
+  compact?: boolean | ToolCompactConfig
 }
 
 export interface ToolCall {
