@@ -38,6 +38,7 @@ async function main() {
   }
 
   fs.mkdirSync(projectDir, { recursive: true })
+  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true })
 
   const packageJson = {
     name: projectName,
@@ -45,7 +46,7 @@ async function main() {
     version: '1.0.0',
     private: true,
     scripts: {
-      dev: 'node --import tsx index.ts',
+      dev: 'node --import tsx src/index.ts',
     },
     dependencies: {
       'deepseek-kit': 'latest',
@@ -53,7 +54,9 @@ async function main() {
       'zod': '^4',
     },
     devDependencies: {
-      tsx: '^4.21.0',
+      'tsx': '^4.21.0',
+      'typescript': '^6',
+      '@types/node': '^25.9.1',
     },
   }
 
@@ -90,10 +93,30 @@ const result = await agent.generate({
 console.log(result.output)
 `
 
+  const tsconfig = `{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "strict": true,
+    "strictNullChecks": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true
+  }
+}
+`
+
   const envExample = `DEEPSEEK_API_KEY=your_api_key_here
 `
 
   fs.writeFileSync(path.join(projectDir, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
+  fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), tsconfig)
   fs.writeFileSync(path.join(projectDir, 'src', 'index.ts'), indexTs)
   fs.writeFileSync(path.join(projectDir, '.env'), envExample)
 

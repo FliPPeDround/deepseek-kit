@@ -3,14 +3,16 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "node --import tsx index.ts"
+    "dev": "node --import tsx src/index.ts"
   },
   "dependencies": {
     "deepseek-kit": "latest",
-    "zod": "latest",
+    "zod": "^4",
     "dotenv": "latest"
   },
   "devDependencies": {
-    "tsx": "^4.21.0"
+    "@types/node": "^25.9.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6"
   }
 }
