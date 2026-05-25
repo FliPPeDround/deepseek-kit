@@ -13,13 +13,15 @@ async function executeToolCalls(
   toolCalls: ChatCompletionTool[],
   tools: Tool[],
   signal?: AbortSignal,
+  runner?: HookRunner,
+  hooks?: GenerateTextParams<any>['hooks'],
 ): Promise<Array<{ tool_call_id: string, content: string }>> {
   return Promise.all(
     toolCalls.map(async (toolCall) => {
       const name = toolCall.function?.name
       const tool = tools.find(t => t.name === name)
       const result = tool
-        ? await tool.execute(toolCall.function.arguments, signal)
+        ? await tool.execute(toolCall.function.arguments, signal, runner, hooks)
         : `Tool execution error: Tool "${name}" not found`
 
       return { tool_call_id: toolCall.id, content: result }
@@ -49,9 +51,34 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
     yield { type: 'step', step: stepRef.value }
 
     if (compactMessage && compactMessage.shouldCompact(lastPromptTokens)) {
-      const compacted = await compactMessage.compact(currentMessages, signal)
-      currentMessages.length = 0
-      currentMessages.push(...compacted)
+      runner.runBeforeMessageCompact(hooks, {
+        promptTokens: lastPromptTokens,
+        messages: [...currentMessages],
+        threshold: compactMessage.threshold,
+      })
+
+      if (runner.stopped) {
+        return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
+      }
+
+      if (runner.skipped) {
+        runner.resetSkip()
+      }
+      else {
+        const messagesBefore = [...currentMessages]
+        const compacted = await compactMessage.compact(currentMessages, signal)
+        currentMessages.length = 0
+        currentMessages.push(...compacted)
+        runner.runAfterMessageCompact(hooks, {
+          messagesBefore,
+          messagesAfter: [...currentMessages],
+          promptTokens: lastPromptTokens,
+          threshold: compactMessage.threshold,
+        })
+        if (runner.stopped) {
+          return { text: lastAssistantMsg(currentMessages), output: undefined, usage: totalUsage }
+        }
+      }
     }
 
     currentModel = runner.runBeforeStep(hooks, stepRef.value, currentMessages, currentTools, currentModel)
@@ -83,7 +110,7 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
       currentMessages.push(stepResult.assistantMessage)
 
       if (stepResult.toolCalls.length > 0 && currentTools.length > 0) {
-        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools, signal)
+        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools, signal, runner, hooks)
         for (const { tool_call_id, content } of toolResults) {
           currentMessages.push({ role: 'tool', content, tool_call_id })
         }

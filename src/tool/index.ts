@@ -1,4 +1,6 @@
 import type { ToolCall, ToolChoice, ToolDefinition } from './types'
+import type { HookRunner } from '@/generate/generate-utils'
+import type { GenerateTextHooks } from '@/generate/types'
 import { z } from 'zod'
 import { createCompactTool } from '@/context/compact'
 import { parseAndValidate } from '@/utils/json-parse'
@@ -95,7 +97,7 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
     enforceStrictSchema(jsonSchema)
   }
 
-  const wrappedExecute = async (args: string, signal?: AbortSignal): Promise<string> => {
+  const wrappedExecute = async (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks): Promise<string> => {
     const result = await parseAndValidate(args, schema)
 
     if (!result.success) {
@@ -119,12 +121,38 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
           const toolCompactConfig = typeof compact === 'object'
             ? compact
             : undefined
-          data = await createCompactTool(toolCompactConfig).compact(
-            data,
-            name,
-            description,
-            signal,
-          )
+          const ct = createCompactTool(toolCompactConfig)
+
+          if (runner && hooks) {
+            runner.runBeforeToolCompact(hooks, {
+              toolName: name,
+              toolDescription: description,
+              content: data,
+              threshold: ct.threshold,
+            })
+
+            if (runner.stopped) {
+              return JSON.stringify({ success: true, data })
+            }
+
+            if (runner.skipped) {
+              runner.resetSkip()
+            }
+            else {
+              const contentBefore = data
+              data = await ct.compact(data, name, description, signal)
+              runner.runAfterToolCompact(hooks, {
+                toolName: name,
+                toolDescription: description,
+                contentBefore,
+                contentAfter: data,
+                threshold: ct.threshold,
+              })
+            }
+          }
+          else {
+            data = await ct.compact(data, name, description, signal)
+          }
         }
         catch {
           // compact failure should not affect the tool result
@@ -140,7 +168,7 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   return {
     ...config,
     parameters: jsonSchema,
-    execute: (args: string, signal?: AbortSignal) => wrappedExecute(args, signal),
+    execute: (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks) => wrappedExecute(args, signal, runner, hooks),
   }
 }
 

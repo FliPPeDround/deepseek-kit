@@ -1,4 +1,4 @@
-import type { GenerateTextHooks, HookContext, StepEvent } from './types'
+import type { BeforeMessageCompactContext, BeforeToolCompactContext, GenerateTextHooks, HookContext, MessageCompactEvent, StepEvent, ToolCompactEvent } from './types'
 import type { DeepSeekModel } from '@/model'
 import type { ChatMessage, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
@@ -64,6 +64,7 @@ export function emptyUsage(): Usage {
 
 export class HookRunner {
   private shouldStop = false
+  private shouldSkip = false
   private parentHookCtx?: HookContext
   public readonly hookCtx: HookContext
 
@@ -74,11 +75,22 @@ export class HookRunner {
         this.shouldStop = true
         this.parentHookCtx?.stop()
       },
+      skip: () => {
+        this.shouldSkip = true
+      },
     }
   }
 
   get stopped() {
     return this.shouldStop
+  }
+
+  get skipped() {
+    return this.shouldSkip
+  }
+
+  resetSkip() {
+    this.shouldSkip = false
   }
 
   runBeforeStep(
@@ -124,5 +136,21 @@ export class HookRunner {
       return result
     }
     return undefined
+  }
+
+  runBeforeMessageCompact(hooks: GenerateTextHooks | undefined, context: BeforeMessageCompactContext): void {
+    hooks?.beforeMessageCompact?.(context, this.hookCtx)
+  }
+
+  runAfterMessageCompact(hooks: GenerateTextHooks | undefined, event: MessageCompactEvent): void {
+    hooks?.afterMessageCompact?.(event, this.hookCtx)
+  }
+
+  runBeforeToolCompact(hooks: GenerateTextHooks | undefined, context: BeforeToolCompactContext): void {
+    hooks?.beforeToolCompact?.(context, this.hookCtx)
+  }
+
+  runAfterToolCompact(hooks: GenerateTextHooks | undefined, event: ToolCompactEvent): void {
+    hooks?.afterToolCompact?.(event, this.hookCtx)
   }
 }

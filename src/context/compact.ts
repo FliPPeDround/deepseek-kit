@@ -55,7 +55,7 @@ Rules:
 export class CompactTool {
   private static instance: CompactTool | null = null
   private readonly cache = new Map<string, string>()
-  private threshold: number = DEFAULT_TOOL_MESSAGE_THRESHOLD
+  private _threshold: number = DEFAULT_TOOL_MESSAGE_THRESHOLD
   private model: Model = 'deepseek-v4-flash'
 
   private constructor() {}
@@ -67,9 +67,13 @@ export class CompactTool {
     return CompactTool.instance
   }
 
+  get threshold(): number {
+    return this._threshold
+  }
+
   update(config: ToolCompactConfig): this {
     if (config.threshold !== undefined) {
-      this.threshold = config.threshold
+      this._threshold = config.threshold
     }
     if (config.model !== undefined) {
       this.model = config.model
@@ -83,7 +87,7 @@ export class CompactTool {
     description: string,
     signal?: AbortSignal,
   ): Promise<string> {
-    if (content.length < this.threshold) {
+    if (content.length < this._threshold) {
       return content
     }
     const contentHash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 16)
@@ -164,20 +168,24 @@ Rules:
 11. Output only the compacted summary — no explanations, no meta-commentary.`
 
 export class CompactMessage {
-  private readonly threshold: number
+  private readonly _threshold: number
   private readonly keepRecentRounds: number
   private readonly model: Model
   private readonly contextWindowSize: number
 
   constructor(config: AgentCompactConfig = {}) {
-    this.threshold = config.threshold ?? DEFAULT_COMPACT_THRESHOLD
+    this._threshold = config.threshold ?? DEFAULT_COMPACT_THRESHOLD
     this.keepRecentRounds = config.keepRecentRounds ?? DEFAULT_KEEP_RECENT_ROUNDS
     this.model = config.model ?? 'deepseek-v4-flash'
     this.contextWindowSize = config.contextWindowSize ?? DEFAULT_CONTEXT_WINDOW_SIZE
   }
 
+  get threshold(): number {
+    return this._threshold
+  }
+
   shouldCompact(promptTokens: number): boolean {
-    return promptTokens >= this.contextWindowSize * this.threshold
+    return promptTokens >= this.contextWindowSize * this._threshold
   }
 
   async compact(

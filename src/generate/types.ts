@@ -30,12 +30,45 @@ export interface BeforeStepResult {
 
 export interface HookContext {
   stop: () => void
+  skip: () => void
+}
+
+export interface BeforeMessageCompactContext {
+  promptTokens: number
+  messages: ChatMessage[]
+  threshold: number
+}
+
+export interface MessageCompactEvent {
+  messagesBefore: ChatMessage[]
+  messagesAfter: ChatMessage[]
+  promptTokens: number
+  threshold: number
+}
+
+export interface BeforeToolCompactContext {
+  toolName: string
+  toolDescription: string
+  content: string
+  threshold: number
+}
+
+export interface ToolCompactEvent {
+  toolName: string
+  toolDescription: string
+  contentBefore: string
+  contentAfter: string
+  threshold: number
 }
 
 export interface GenerateTextHooks {
   beforeStep?: (context: BeforeStepContext, hookCtx: HookContext) => BeforeStepResult | void
   afterStep?: (step: StepEvent, hookCtx: HookContext) => void
   onError?: (error: AgentError, hookCtx: HookContext) => void | AgentError | Promise<AgentError | void>
+  beforeMessageCompact?: (context: BeforeMessageCompactContext, hookCtx: HookContext) => void
+  afterMessageCompact?: (event: MessageCompactEvent, hookCtx: HookContext) => void
+  beforeToolCompact?: (context: BeforeToolCompactContext, hookCtx: HookContext) => void
+  afterToolCompact?: (event: ToolCompactEvent, hookCtx: HookContext) => void
 }
 
 export interface GenerateTextParams<T extends z.ZodTypeAny> {

@@ -1,7 +1,9 @@
+import type { GenerateTextHooks } from '@/generate/types'
 import type { ChatMessage } from '@/model/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { CompactMessage, CompactTool, createCompactTool } from '@/context/compact'
+import { HookRunner } from '@/generate/generate-utils'
 import { tool } from '@/tool'
 
 vi.mock('@/model', () => ({
@@ -86,6 +88,16 @@ describe('compactTool', () => {
     it('uses default model when not specified', () => {
       const ct = createCompactTool({ threshold: 100 })
       expect((ct as any).model).toBe('deepseek-v4-flash')
+    })
+
+    it('exposes threshold via getter', () => {
+      const ct = createCompactTool({ threshold: 500 })
+      expect(ct.threshold).toBe(500)
+    })
+
+    it('exposes default threshold via getter', () => {
+      const ct = createCompactTool()
+      expect(ct.threshold).toBe(1500)
     })
   })
 })
@@ -203,7 +215,7 @@ describe('compactMessage', () => {
   describe('constructor', () => {
     it('uses default values', () => {
       const cm = new CompactMessage()
-      expect((cm as any).threshold).toBe(0.85)
+      expect(cm.threshold).toBe(0.85)
       expect((cm as any).keepRecentRounds).toBe(3)
       expect((cm as any).model).toBe('deepseek-v4-flash')
       expect((cm as any).contextWindowSize).toBe(1_000_000)
@@ -216,7 +228,7 @@ describe('compactMessage', () => {
         model: 'deepseek-v4-pro',
         contextWindowSize: 500_000,
       })
-      expect((cm as any).threshold).toBe(0.7)
+      expect(cm.threshold).toBe(0.7)
       expect((cm as any).keepRecentRounds).toBe(5)
       expect((cm as any).model).toBe('deepseek-v4-pro')
       expect((cm as any).contextWindowSize).toBe(500_000)
@@ -336,5 +348,140 @@ describe('compactMessage', () => {
       expect(result[1]).toEqual({ role: 'user', content: 'question 3' })
       expect(result[2]).toEqual({ role: 'assistant', content: 'answer 3' })
     })
+  })
+
+  describe('threshold getter', () => {
+    it('exposes threshold via getter', () => {
+      const cm = new CompactMessage({ threshold: 0.7 })
+      expect(cm.threshold).toBe(0.7)
+    })
+
+    it('exposes default threshold via getter', () => {
+      const cm = new CompactMessage()
+      expect(cm.threshold).toBe(0.85)
+    })
+  })
+})
+
+describe('tool with compact hooks', () => {
+  const schema = z.object({ query: z.string() })
+
+  beforeEach(() => {
+    ;(CompactTool as any).instance = null
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('calls beforeToolCompact and afterToolCompact hooks', async () => {
+    const ct = createCompactTool({ threshold: 10 })
+    vi.spyOn(ct, 'compact').mockResolvedValue('compacted content')
+
+    const beforeFn = vi.fn()
+    const afterFn = vi.fn()
+    const hooks: GenerateTextHooks = {
+      beforeToolCompact: beforeFn,
+      afterToolCompact: afterFn,
+    }
+    const runner = new HookRunner()
+
+    const t = tool({
+      name: 'hooked_tool',
+      description: 'A tool with hooks',
+      schema,
+      compact: { threshold: 10 },
+      execute: async () => 'a'.repeat(100),
+    })
+
+    await t.execute(JSON.stringify({ query: 'test' }), undefined, runner, hooks)
+
+    expect(beforeFn).toHaveBeenCalledTimes(1)
+    expect(beforeFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'hooked_tool',
+        toolDescription: 'A tool with hooks',
+        threshold: 10,
+      }),
+      runner.hookCtx,
+    )
+
+    expect(afterFn).toHaveBeenCalledTimes(1)
+    expect(afterFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'hooked_tool',
+        contentBefore: expect.any(String),
+        contentAfter: 'compacted content',
+        threshold: 10,
+      }),
+      runner.hookCtx,
+    )
+  })
+
+  it('skips compact when beforeToolCompact calls skip()', async () => {
+    const ct = createCompactTool({ threshold: 10 })
+    const compactSpy = vi.spyOn(ct, 'compact').mockResolvedValue('compacted content')
+
+    const hooks: GenerateTextHooks = {
+      beforeToolCompact: (_ctx, hookCtx) => { hookCtx.skip() },
+    }
+    const runner = new HookRunner()
+
+    const t = tool({
+      name: 'skip_compact_tool',
+      description: 'A tool',
+      schema,
+      compact: { threshold: 10 },
+      execute: async () => 'a'.repeat(100),
+    })
+
+    const result = await t.execute(JSON.stringify({ query: 'test' }), undefined, runner, hooks)
+    const parsed = JSON.parse(result)
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toBe('a'.repeat(100))
+    expect(compactSpy).not.toHaveBeenCalled()
+  })
+
+  it('returns original data when beforeToolCompact calls stop()', async () => {
+    const ct = createCompactTool({ threshold: 10 })
+    const compactSpy = vi.spyOn(ct, 'compact').mockResolvedValue('compacted content')
+
+    const hooks: GenerateTextHooks = {
+      beforeToolCompact: (_ctx, hookCtx) => { hookCtx.stop() },
+    }
+    const runner = new HookRunner()
+
+    const t = tool({
+      name: 'stop_compact_tool',
+      description: 'A tool',
+      schema,
+      compact: { threshold: 10 },
+      execute: async () => 'a'.repeat(100),
+    })
+
+    const result = await t.execute(JSON.stringify({ query: 'test' }), undefined, runner, hooks)
+    const parsed = JSON.parse(result)
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toBe('a'.repeat(100))
+    expect(runner.stopped).toBe(true)
+    expect(compactSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not call compact hooks when runner and hooks are not provided', async () => {
+    const ct = createCompactTool({ threshold: 10 })
+    vi.spyOn(ct, 'compact').mockResolvedValue('compacted content')
+
+    const t = tool({
+      name: 'no_hooks_tool',
+      description: 'A tool',
+      schema,
+      compact: { threshold: 10 },
+      execute: async () => 'a'.repeat(100),
+    })
+
+    const result = await t.execute(JSON.stringify({ query: 'test' }))
+    const parsed = JSON.parse(result)
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toBe('compacted content')
   })
 })

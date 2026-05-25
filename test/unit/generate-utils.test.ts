@@ -157,4 +157,143 @@ describe('hookRunner', () => {
     const result = runner.runBeforeStep(undefined, 1, [], [], model)
     expect(result).toBe(model)
   })
+
+  it('initially not skipped', () => {
+    const runner = new HookRunner()
+    expect(runner.skipped).toBe(false)
+  })
+
+  it('marks skipped when hookCtx.skip() is called', () => {
+    const runner = new HookRunner()
+    runner.hookCtx.skip()
+    expect(runner.skipped).toBe(true)
+  })
+
+  it('resetSkip clears skipped state', () => {
+    const runner = new HookRunner()
+    runner.hookCtx.skip()
+    expect(runner.skipped).toBe(true)
+    runner.resetSkip()
+    expect(runner.skipped).toBe(false)
+  })
+
+  it('skip does not propagate to parent context', () => {
+    const parent = new HookRunner()
+    const child = new HookRunner(parent.hookCtx)
+    child.hookCtx.skip()
+    expect(child.skipped).toBe(true)
+    expect(parent.skipped).toBe(false)
+  })
+
+  it('stop and skip can be used independently', () => {
+    const runner = new HookRunner()
+    runner.hookCtx.skip()
+    expect(runner.skipped).toBe(true)
+    expect(runner.stopped).toBe(false)
+    runner.hookCtx.stop()
+    expect(runner.stopped).toBe(true)
+    expect(runner.skipped).toBe(true)
+  })
+})
+
+describe('hookRunner compact hooks', () => {
+  it('runBeforeMessageCompact calls beforeMessageCompact hook', () => {
+    const runner = new HookRunner()
+    const beforeFn = vi.fn()
+    const hooks = { beforeMessageCompact: beforeFn }
+    const context = {
+      promptTokens: 100,
+      messages: [{ role: 'user' as const, content: 'hello' }],
+      threshold: 0.85,
+    }
+    runner.runBeforeMessageCompact(hooks, context)
+    expect(beforeFn).toHaveBeenCalledWith(context, runner.hookCtx)
+  })
+
+  it('runAfterMessageCompact calls afterMessageCompact hook', () => {
+    const runner = new HookRunner()
+    const afterFn = vi.fn()
+    const hooks = { afterMessageCompact: afterFn }
+    const event = {
+      messagesBefore: [{ role: 'user' as const, content: 'hello' }],
+      messagesAfter: [{ role: 'user' as const, name: 'compact-summary', content: 'summary' }],
+      promptTokens: 100,
+      threshold: 0.85,
+    }
+    runner.runAfterMessageCompact(hooks, event)
+    expect(afterFn).toHaveBeenCalledWith(event, runner.hookCtx)
+  })
+
+  it('runBeforeToolCompact calls beforeToolCompact hook', () => {
+    const runner = new HookRunner()
+    const beforeFn = vi.fn()
+    const hooks = { beforeToolCompact: beforeFn }
+    const context = {
+      toolName: 'readFile',
+      toolDescription: 'Reads a file',
+      content: 'file contents here',
+      threshold: 1500,
+    }
+    runner.runBeforeToolCompact(hooks, context)
+    expect(beforeFn).toHaveBeenCalledWith(context, runner.hookCtx)
+  })
+
+  it('runAfterToolCompact calls afterToolCompact hook', () => {
+    const runner = new HookRunner()
+    const afterFn = vi.fn()
+    const hooks = { afterToolCompact: afterFn }
+    const event = {
+      toolName: 'readFile',
+      toolDescription: 'Reads a file',
+      contentBefore: 'long file contents',
+      contentAfter: 'compacted contents',
+      threshold: 1500,
+    }
+    runner.runAfterToolCompact(hooks, event)
+    expect(afterFn).toHaveBeenCalledWith(event, runner.hookCtx)
+  })
+
+  it('compact hooks do not fire when hooks are undefined', () => {
+    const runner = new HookRunner()
+    expect(() => runner.runBeforeMessageCompact(undefined, { promptTokens: 0, messages: [], threshold: 0.85 })).not.toThrow()
+    expect(() => runner.runAfterMessageCompact(undefined, { messagesBefore: [], messagesAfter: [], promptTokens: 0, threshold: 0.85 })).not.toThrow()
+    expect(() => runner.runBeforeToolCompact(undefined, { toolName: 'test', toolDescription: '', content: '', threshold: 100 })).not.toThrow()
+    expect(() => runner.runAfterToolCompact(undefined, { toolName: 'test', toolDescription: '', contentBefore: '', contentAfter: '', threshold: 100 })).not.toThrow()
+  })
+
+  it('beforeMessageCompact can call skip()', () => {
+    const runner = new HookRunner()
+    const hooks = {
+      beforeMessageCompact: (_ctx: any, hookCtx: any) => { hookCtx.skip() },
+    }
+    runner.runBeforeMessageCompact(hooks, { promptTokens: 100, messages: [], threshold: 0.85 })
+    expect(runner.skipped).toBe(true)
+  })
+
+  it('beforeToolCompact can call skip()', () => {
+    const runner = new HookRunner()
+    const hooks = {
+      beforeToolCompact: (_ctx: any, hookCtx: any) => { hookCtx.skip() },
+    }
+    runner.runBeforeToolCompact(hooks, { toolName: 'test', toolDescription: '', content: '', threshold: 100 })
+    expect(runner.skipped).toBe(true)
+  })
+
+  it('beforeMessageCompact can call stop()', () => {
+    const runner = new HookRunner()
+    const hooks = {
+      beforeMessageCompact: (_ctx: any, hookCtx: any) => { hookCtx.stop() },
+    }
+    runner.runBeforeMessageCompact(hooks, { promptTokens: 100, messages: [], threshold: 0.85 })
+    expect(runner.stopped).toBe(true)
+  })
+
+  it('beforeToolCompact can call stop()', () => {
+    const runner = new HookRunner()
+    const hooks = {
+      beforeToolCompact: (_ctx: any, hookCtx: any) => { hookCtx.stop() },
+    }
+    runner.runBeforeToolCompact(hooks, { toolName: 'test', toolDescription: '', content: '', threshold: 100 })
+    expect(runner.stopped).toBe(true)
+  })
 })
