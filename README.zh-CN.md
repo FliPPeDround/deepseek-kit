@@ -88,7 +88,7 @@ const model = createModel({ model: 'deepseek-v4-flash' })
 const weatherTool = tool({
   name: 'get_weather',
   description: '获取指定城市的天气信息',
-  parameters: z.object({
+  schema: z.object({
     city: z.string().describe('城市名称'),
   }),
   execute: async ({ city }) => `${city}：晴，25°C`,

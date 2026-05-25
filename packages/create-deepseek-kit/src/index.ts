@@ -65,7 +65,7 @@ const model = createModel({ model: 'deepseek-v4-flash' })
 const weatherTool = tool({
   name: 'get_weather',
   description: 'Get weather information for a city',
-  parameters: z.object({
+  schema: z.object({
     city: z.string().describe('City name'),
   }),
   execute: async ({ city }) => \`\${city}: Sunny, 25°C\`,
@@ -94,7 +94,7 @@ console.log(result.output)
 `
 
   fs.writeFileSync(path.join(projectDir, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
-  fs.writeFileSync(path.join(projectDir, 'index.ts'), indexTs)
+  fs.writeFileSync(path.join(projectDir, 'src', 'index.ts'), indexTs)
   fs.writeFileSync(path.join(projectDir, '.env'), envExample)
 
   const gettingStarted = `
