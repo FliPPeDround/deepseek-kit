@@ -15,14 +15,14 @@ packages:
 overrides:
   nuxt-og-image: 6.5.1
 catalog:
-  '@clack/prompts': ^1.4.0
-  kolorist: ^1.8.0
 catalogs:
   cli:
     '@antfu/eslint-config': ^8.2.0
     '@antfu/ni': ^30.1.0
+    '@clack/prompts': ^1.4.0
     bumpp: ^11.0.1
     eslint: ^10.2.1
+    kolorist: ^1.8.0
     lint-staged: ^16.4.0
     publint: ^0.3.18
     simple-git-hooks: ^2.13.1

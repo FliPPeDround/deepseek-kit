@@ -17,11 +17,9 @@
     "prepublishOnly": "nr build",
     "release": "bumpp"
   },
-  "dependencies": {
-    "@clack/prompts": "catalog:",
-    "kolorist": "catalog:"
-  },
   "devDependencies": {
+    "@clack/prompts": "catalog:cli",
+    "kolorist": "catalog:cli",
     "tsdown": "catalog:cli",
     "typescript": "catalog:cli"
   }
