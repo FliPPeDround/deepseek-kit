@@ -2,6 +2,7 @@
   "name": "create-deepseek-kit",
   "type": "module",
   "version": "0.0.1",
+  "private": false,
   "description": "Create a deepseek-kit project",
   "author": "FliPPeDround <flippedround@qq.com>",
   "license": "MIT",
