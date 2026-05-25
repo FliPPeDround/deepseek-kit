@@ -1,0 +1,16 @@
+{
+  "name": "deepseek-kit-demo",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node --import tsx index.ts"
+  },
+  "dependencies": {
+    "deepseek-kit": "latest",
+    "zod": "latest",
+    "dotenv": "latest"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

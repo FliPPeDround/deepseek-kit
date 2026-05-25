@@ -14,6 +14,20 @@ A lightweight Agent framework with native-level DeepSeek adaptation — Precise 
 
 ---
 
+## 🚀 Quick Experience
+
+**Try it online** — no local setup needed:
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/FliPPeDround/deepseek-kit/tree/main/stackblitz)
+
+**Or scaffold a project locally:**
+
+```bash
+pnpx create deepseek-kit my-agent
+```
+
+---
+
 ## Why deepseek-kit?
 
 LangChain.js and AI SDK are excellent general-purpose frameworks, but DeepSeek's API has unique mechanisms that they cannot properly handle. deepseek-kit is built from the ground up to solve these problems.

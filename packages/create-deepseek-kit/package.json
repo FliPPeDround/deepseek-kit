@@ -1,0 +1,28 @@
+{
+  "name": "create-deepseek-kit",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Create a deepseek-kit project",
+  "author": "FliPPeDround <flippedround@qq.com>",
+  "license": "MIT",
+  "bin": {
+    "create-deepseek-kit": "./dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepublishOnly": "nr build",
+    "release": "bumpp"
+  },
+  "dependencies": {
+    "@clack/prompts": "catalog:",
+    "kolorist": "catalog:"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:cli",
+    "typescript": "catalog:cli"
+  }
+}
