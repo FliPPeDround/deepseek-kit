@@ -2,9 +2,6 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n'],
   extends: ['shadcn-docs-nuxt'],
-  // site: {
-  //   url: 'https://deepseek-kit.vercel.com',
-  // },
 
   i18n: {
     defaultLocale: 'en',
@@ -22,6 +19,14 @@ export default defineNuxtConfig({
     ],
   },
   compatibilityDate: '2024-07-06',
+  ogImage: {
+    zeroRuntime: true,
+  },
+  content: {
+    highlight: {
+      preload: ['json', 'ts', 'bash', 'yaml', 'mermaid'],
+    },
+  },
   vite: {
     build: {
       sourcemap: false,

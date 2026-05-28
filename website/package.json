@@ -3,9 +3,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' nuxt build",
     "dev": "nuxt dev",
-    "generate": "nuxt generate",
+    "generate": "NODE_OPTIONS='--max-old-space-size=4096' nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
