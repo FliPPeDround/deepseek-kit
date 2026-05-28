@@ -3,7 +3,7 @@ import type { AgentCompactConfig } from '@/context/compact'
 import type { AgentError } from '@/errors'
 import type { DeepSeekModel } from '@/model'
 import type { ChatMessage, ModelOptions, Usage } from '@/model/types'
-import type { Tool } from '@/tool'
+import type { ConsistentTools, Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 
 export interface StepEvent {
@@ -73,7 +73,7 @@ export interface GenerateTextHooks {
 
 export interface GenerateTextParams<T extends z.ZodTypeAny> {
   model: DeepSeekModel
-  tools?: Tool[]
+  tools?: ConsistentTools
   system?: string
   messages?: ChatMessage[]
   fewShot?: ChatMessage[]

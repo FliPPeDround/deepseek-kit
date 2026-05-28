@@ -12,6 +12,27 @@ const weatherTool = tool({
   schema: z.object({
     city: z.string().describe('the city you want to know the weather of'),
   }),
+  strict: true,
+  execute: async (input) => {
+    if (input.city === '重庆') {
+      return `重庆今天天气晴朗`
+    }
+    if (input.city === '北京') {
+      return `北京今天在下大雨`
+    }
+    return `${input.city}今天天气晴朗`
+  },
+  timeout: 10000,
+  retries: 2,
+})
+
+const weatherTool1 = tool({
+  name: 'weather1',
+  description: 'useful when you want to know the weather',
+  schema: z.object({
+    city: z.string().describe('the city you want to know the weather of'),
+  }),
+  strict: true,
   execute: async (input) => {
     if (input.city === '重庆') {
       return `重庆今天天气晴朗`
@@ -27,7 +48,7 @@ const weatherTool = tool({
 
 const agent = createAgent({
   model,
-  tools: [weatherTool],
+  tools: [weatherTool, weatherTool1],
   output: {
     schema: z.object({
       city: z.string(),

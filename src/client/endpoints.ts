@@ -3,7 +3,7 @@ export function getChatEndpoint(baseUrl: string): string {
 }
 
 export function getFimEndpoint(baseUrl: string): string {
-  return `${baseUrl}/completions`
+  return new URL('completions', baseUrl).toString()
 }
 
 export function getModelsEndpoint(baseUrl: string): string {

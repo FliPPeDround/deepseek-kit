@@ -4,7 +4,7 @@ import type { InvokeParams, ModelOptions, ResolvedModelOptions } from './types'
 import type { FIMParams } from '@/fim/types'
 import process from 'node:process'
 import { toMerged } from 'es-toolkit'
-import { DEEPSEEK_API_BASE_URL, DEEPSEEK_API_BETA_MODE_BASE_URL, DEEPSEEK_MODELS } from '@/constants'
+import { DEEPSEEK_API_BASE_URL, DEEPSEEK_MODELS } from '@/constants'
 import { getBalance } from './balance'
 import { fim } from './fim'
 import { invoke, invokeStream } from './invoke'
@@ -16,26 +16,43 @@ export class DeepSeekModel {
 
   constructor(options: ModelOptions) {
     this._config = resolveConfig(options)
+    if (this._config.strict) {
+      this.enableBeta()
+    }
   }
 
   public get config(): ResolvedModelOptions {
     return this._config
   }
 
+  public enableBeta(): this {
+    const base = this._config.baseURL
+    if (base.endsWith('/beta') || base.endsWith('/beta/')) {
+      return this
+    }
+    this._config.baseURL = base.endsWith('/') ? `${base}beta/` : `${base}/beta/`
+    return this
+  }
+
+  private tryEnableBeta(params: InvokeParams) {
+    if (params.tools?.some(t => t.strict === true)) {
+      this.enableBeta()
+    }
+  }
+
   public invoke(params: InvokeParams) {
+    this.tryEnableBeta(params)
     return invoke(this._config, params)
   }
 
   public invokeStream(params: InvokeParams) {
+    this.tryEnableBeta(params)
     return invokeStream(this._config, params)
   }
 
   public fim(params: Omit<FIMParams, 'model'>) {
-    const batchConfig = {
-      ...this._config,
-      baseURL: DEEPSEEK_API_BETA_MODE_BASE_URL,
-    }
-    return fim(batchConfig, params)
+    this.enableBeta()
+    return fim(this._config, params)
   }
 
   public withConfig(options: Partial<ModelOptions>): DeepSeekModel {
@@ -60,6 +77,7 @@ export function resolveConfig(options: ModelOptions): ResolvedModelOptions {
         type: 'enabled',
       },
       reasoningEffort: options.thinking?.type === 'disabled' ? undefined : 'high',
+      strict: false,
     },
     options,
   ) as ResolvedModelOptions

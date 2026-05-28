@@ -24,10 +24,10 @@ export interface ToolCompactConfig {
   model?: Model
 }
 
-export interface ToolDefinition<T extends z.ZodObject> {
+export interface StrictToolDefinition<T extends z.ZodObject> {
   name: string
   description: string
-  strict?: boolean
+  strict: true
   required?: boolean
   schema: T
   execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
@@ -35,6 +35,25 @@ export interface ToolDefinition<T extends z.ZodObject> {
   retries?: number
   compact?: boolean | ToolCompactConfig
 }
+
+export interface NonStrictToolDefinition<T extends z.ZodObject> {
+  name: string
+  description: string
+  strict?: false
+  required?: boolean
+  schema: T
+  execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
+  timeout?: number
+  retries?: number
+  compact?: boolean | ToolCompactConfig
+}
+
+export type ToolDefinition<
+  T extends z.ZodObject,
+  TStrict extends boolean | undefined = undefined,
+> = TStrict extends true
+  ? StrictToolDefinition<T>
+  : NonStrictToolDefinition<T>
 
 export interface ToolCall {
   type: 'function'
@@ -83,3 +102,31 @@ export interface ChatCompletionTool {
     arguments: string
   }
 }
+
+export interface StrictTool {
+  name: string
+  description: string
+  strict: true
+  required?: boolean
+  schema: z.ZodObject
+  parameters: Record<string, any>
+  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any) => Promise<string>
+  timeout?: number
+  retries?: number
+  compact?: boolean | ToolCompactConfig
+}
+
+export interface NonStrictTool {
+  name: string
+  description: string
+  strict?: undefined | false
+  required?: boolean
+  schema: z.ZodObject
+  parameters: Record<string, any>
+  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any) => Promise<string>
+  timeout?: number
+  retries?: number
+  compact?: boolean | ToolCompactConfig
+}
+
+export type ConsistentTools = StrictTool[] | NonStrictTool[]

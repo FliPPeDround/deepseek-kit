@@ -13,7 +13,8 @@ describe('getChatEndpoint', () => {
 describe('getFimEndpoint', () => {
   it.each([
     ['https://api.deepseek.com', 'https://api.deepseek.com/completions'],
-    ['https://api.deepseek.com/', 'https://api.deepseek.com//completions'],
+    ['https://api.deepseek.com/', 'https://api.deepseek.com/completions'],
+    ['https://api.deepseek.com/beta/', 'https://api.deepseek.com/beta/completions'],
   ])('builds FIM endpoint from base URL %s', (baseUrl, expected) => {
     expect(getFimEndpoint(baseUrl)).toBe(expected)
   })

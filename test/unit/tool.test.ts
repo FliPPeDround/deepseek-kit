@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { buildToolParameters, serializeResult, tool } from '@/tool'
+import { buildToolParameters, serializeResult, tool, validateToolConsistency } from '@/tool'
 
 describe('serializeResult', () => {
   it.each([
@@ -143,7 +143,7 @@ describe('tool', () => {
   })
 
   describe('strict mode', () => {
-    it('enforces strict schema when strict=true', () => {
+    it('passes strict flag to tool parameters when strict=true', () => {
       const t = tool({
         name: 'strict_tool',
         description: 'Strict tool',
@@ -153,7 +153,118 @@ describe('tool', () => {
       })
 
       expect(t.strict).toBe(true)
-      expect(t.parameters.additionalProperties).toBe(false)
+      const { toolParameters } = buildToolParameters([t])
+      expect(toolParameters![0].function.strict).toBe(true)
+    })
+
+    it('does not include strict field when strict is not set', () => {
+      const t = tool({
+        name: 'non_strict_tool',
+        description: 'Non-strict tool',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+
+      expect(t.strict).toBeUndefined()
+      const { toolParameters } = buildToolParameters([t])
+      expect(toolParameters![0].function.strict).toBeUndefined()
+    })
+
+    it('does not modify schema locally when strict=true', () => {
+      const schemaWithoutStrict = z.object({
+        city: z.string().describe('City name'),
+        optional: z.string().optional(),
+      })
+      const t = tool({
+        name: 'strict_tool',
+        description: 'Strict tool',
+        strict: true,
+        schema: schemaWithoutStrict,
+        execute: async ({ city }) => city,
+      })
+
+      expect(t.parameters.required).not.toContain('optional')
+    })
+
+    it('sets strict: true for all tools when modelStrict=true', () => {
+      const t1 = tool({
+        name: 'tool_a',
+        description: 'Tool A',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+      const t2 = tool({
+        name: 'tool_b',
+        description: 'Tool B',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+
+      const { toolParameters } = buildToolParameters([t1, t2], true)
+      expect(toolParameters![0].function.strict).toBe(true)
+      expect(toolParameters![1].function.strict).toBe(true)
+    })
+  })
+
+  describe('validateToolConsistency', () => {
+    it('passes when all tools are strict', () => {
+      const t1 = tool({
+        name: 'strict_a',
+        description: 'Strict A',
+        strict: true,
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+      const t2 = tool({
+        name: 'strict_b',
+        description: 'Strict B',
+        strict: true,
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+
+      expect(() => validateToolConsistency([t1, t2])).not.toThrow()
+    })
+
+    it('passes when no tools are strict', () => {
+      const t1 = tool({
+        name: 'tool_a',
+        description: 'Tool A',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+      const t2 = tool({
+        name: 'tool_b',
+        description: 'Tool B',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+
+      expect(() => validateToolConsistency([t1, t2])).not.toThrow()
+    })
+
+    it('throws when mixing strict and non-strict tools', () => {
+      const t1 = tool({
+        name: 'strict_tool',
+        description: 'Strict',
+        strict: true,
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+      const t2 = tool({
+        name: 'non_strict_tool',
+        description: 'Non-strict',
+        schema: weatherSchema,
+        execute: async ({ city }) => city,
+      })
+
+      expect(() => validateToolConsistency([t1, t2])).toThrow(
+        'When using strict mode, all tools must have strict: true',
+      )
+    })
+
+    it('passes for empty tools array', () => {
+      expect(() => validateToolConsistency([])).not.toThrow()
     })
   })
 

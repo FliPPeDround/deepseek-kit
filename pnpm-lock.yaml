@@ -203,6 +203,12 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  examples/tools:
+    dependencies:
+      deepseek-kit:
+        specifier: workspace:*
+        version: link:../..
+
   packages/create-deepseek-kit:
     devDependencies:
       '@clack/prompts':

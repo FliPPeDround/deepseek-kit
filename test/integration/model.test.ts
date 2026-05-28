@@ -1,5 +1,7 @@
+import { z } from 'zod'
 import { DEEPSEEK_API_BASE_URL } from '@/constants'
 import { createModel, DeepSeekModel, resolveConfig } from '@/model'
+import { tool } from '@/tool'
 import { createMockChatCompletion, createMockToolCallCompletion, createTextChunks, createToolCallChunks, MOCK_API_KEY, mockBalance, mockChatCompletion, mockFetchStream, mockFIM, mockListModels } from '../helpers'
 
 describe('deepSeekModel', () => {
@@ -106,6 +108,122 @@ describe('deepSeekModel', () => {
 
       expect(result.choices[0].message.content).toBe('{"answer": "42"}')
     })
+
+    it('uses beta endpoint when strict tool is present', async () => {
+      mockChatCompletion()
+
+      const strictTool = tool({
+        name: 'get_weather',
+        description: 'Get weather',
+        strict: true,
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      await model.invoke({
+        messages: [{ role: 'user', content: 'Hello' }],
+        tools: [strictTool],
+      })
+
+      const calledUrl = (fetch as any).mock.calls[0][0] as string
+      expect(calledUrl).toContain('/beta/')
+    })
+
+    it('uses standard endpoint when no strict tool is present', async () => {
+      mockChatCompletion()
+
+      const normalTool = tool({
+        name: 'get_weather',
+        description: 'Get weather',
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      await model.invoke({
+        messages: [{ role: 'user', content: 'Hello' }],
+        tools: [normalTool],
+      })
+
+      const calledUrl = (fetch as any).mock.calls[0][0] as string
+      expect(calledUrl).not.toContain('/beta/')
+    })
+
+    it('uses beta endpoint when model strict=true', async () => {
+      mockChatCompletion()
+
+      const normalTool = tool({
+        name: 'get_weather',
+        description: 'Get weather',
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro', strict: true })
+      await model.invoke({
+        messages: [{ role: 'user', content: 'Hello' }],
+        tools: [normalTool],
+      })
+
+      const calledUrl = (fetch as any).mock.calls[0][0] as string
+      expect(calledUrl).toContain('/beta/')
+
+      const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+      expect(body.tools[0].function.strict).toBe(true)
+    })
+
+    it('throws when mixing strict and non-strict tools without model strict', async () => {
+      mockChatCompletion()
+
+      const strictTool = tool({
+        name: 'strict_tool',
+        description: 'Strict',
+        strict: true,
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+      const normalTool = tool({
+        name: 'normal_tool',
+        description: 'Normal',
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      await expect(
+        model.invoke({
+          messages: [{ role: 'user', content: 'Hello' }],
+          tools: [strictTool, normalTool],
+        }),
+      ).rejects.toThrow('When using strict mode, all tools must have strict: true')
+    })
+
+    it('does not throw when mixing with model strict=true', async () => {
+      mockChatCompletion()
+
+      const strictTool = tool({
+        name: 'strict_tool',
+        description: 'Strict',
+        strict: true,
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+      const normalTool = tool({
+        name: 'normal_tool',
+        description: 'Normal',
+        schema: z.object({ city: z.string() }),
+        execute: async ({ city }) => city,
+      })
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro', strict: true })
+      await model.invoke({
+        messages: [{ role: 'user', content: 'Hello' }],
+        tools: [strictTool, normalTool],
+      })
+
+      expect(fetch).toHaveBeenCalled()
+    })
   })
 
   describe('invokeStream', () => {
@@ -160,6 +278,54 @@ describe('deepSeekModel', () => {
 
       expect(result.object).toBe('text_completion')
       expect(result.choices[0].text).toBe('completed code here')
+    })
+
+    it('uses beta endpoint for FIM', async () => {
+      mockFIM()
+
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-flash' })
+      await model.fim({ prompt: 'function hello(' })
+
+      const calledUrl = (fetch as any).mock.calls[0][0] as string
+      expect(calledUrl).toContain('/beta/')
+    })
+  })
+
+  describe('enableBeta', () => {
+    it('appends /beta/ to baseURL', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      model.enableBeta()
+      expect(model.config.baseURL).toBe('https://api.deepseek.com/beta/')
+    })
+
+    it('is idempotent', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      model.enableBeta()
+      model.enableBeta()
+      expect(model.config.baseURL).toBe('https://api.deepseek.com/beta/')
+    })
+
+    it('returns this for chaining', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro' })
+      const result = model.enableBeta()
+      expect(result).toBe(model)
+    })
+
+    it('handles baseURL with trailing slash', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro', baseURL: 'https://custom.api.com/' })
+      model.enableBeta()
+      expect(model.config.baseURL).toBe('https://custom.api.com/beta/')
+    })
+
+    it('handles baseURL without trailing slash', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro', baseURL: 'https://custom.api.com' })
+      model.enableBeta()
+      expect(model.config.baseURL).toBe('https://custom.api.com/beta/')
+    })
+
+    it('is automatically called when strict=true', () => {
+      const model = new DeepSeekModel({ apiKey: MOCK_API_KEY, model: 'deepseek-v4-pro', strict: true })
+      expect(model.config.baseURL).toContain('/beta/')
     })
   })
 

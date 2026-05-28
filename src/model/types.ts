@@ -55,6 +55,8 @@ export interface ModelOptions {
   timeout?: number
   /** Maximum number of retries on 429/500/503 errors. Defaults to 3. */
   maxRetries?: number
+  /** Enable strict mode for all tool calls. Uses the Beta endpoint and passes strict: true for all tools. */
+  strict?: boolean
 }
 
 export type ResolvedModelOptions = Required<ModelOptions> & {
@@ -62,6 +64,7 @@ export type ResolvedModelOptions = Required<ModelOptions> & {
   apiKey: string
   model: Model
   thinking: { type: 'enabled' | 'disabled' }
+  strict: boolean
 }
 
 export interface LogProbsContent {

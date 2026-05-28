@@ -1,4 +1,4 @@
-import type { ToolCall, ToolChoice, ToolDefinition } from './types'
+import type { ConsistentTools, NonStrictTool, StrictTool, StrictToolDefinition, ToolCall, ToolChoice, ToolDefinition } from './types'
 import type { HookRunner } from '@/generate/generate-utils'
 import type { GenerateTextHooks } from '@/generate/types'
 import { z } from 'zod'
@@ -89,13 +89,11 @@ export function serializeResult(result: unknown): string {
   }
 }
 
-export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
+export function tool<T extends z.ZodObject>(config: StrictToolDefinition<T>): StrictTool
+export function tool<T extends z.ZodObject>(config: ToolDefinition<T, false | undefined>): NonStrictTool
+export function tool(config: any) {
   const { schema, execute, compact, name, description, timeout = 60000, retries = 0 } = config
   const jsonSchema = z.toJSONSchema(schema)
-
-  if (config.strict) {
-    enforceStrictSchema(jsonSchema)
-  }
 
   const wrappedExecute = async (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks): Promise<string> => {
     const result = await parseAndValidate(args, schema)
@@ -172,34 +170,27 @@ export function tool<T extends z.ZodObject>(config: ToolDefinition<T>) {
   }
 }
 
-function enforceStrictSchema(schema: Record<string, any>): void {
-  if (schema.type === 'object') {
-    schema.additionalProperties = false
-    if (!schema.required && schema.properties) {
-      schema.required = Object.keys(schema.properties)
-    }
-  }
-  if (schema.properties) {
-    for (const prop of Object.values(schema.properties)) {
-      if (typeof prop === 'object' && prop !== null) {
-        enforceStrictSchema(prop)
-      }
-    }
-  }
-  if (schema.items && typeof schema.items === 'object') {
-    enforceStrictSchema(schema.items)
+export type Tool = StrictTool | NonStrictTool
+export type { ConsistentTools, NonStrictTool, StrictTool }
+
+export function validateToolConsistency(tools: Tool[]): void {
+  const strictCount = tools.filter(t => t.strict === true).length
+  if (strictCount > 0 && strictCount < tools.length) {
+    throw new Error(
+      'When using strict mode, all tools must have strict: true. '
+      + 'Either set strict: true on all tools, or use createModel({ strict: true }) to enable strict mode globally.',
+    )
   }
 }
 
-export type Tool = ReturnType<typeof tool>
-
-export function buildToolParameters(tools: Tool[]) {
+export function buildToolParameters(tools: Tool[], modelStrict?: boolean) {
   if (tools.length === 0) {
     return {
       toolParameters: undefined,
       toolChoice: undefined,
     }
   }
+  const useStrict = modelStrict || tools.some(t => t.strict === true)
   const toolParameters: ToolCall[] = []
   let toolChoice: ToolChoice | undefined
   const requiredTools: string[] = []
@@ -209,7 +200,7 @@ export function buildToolParameters(tools: Tool[]) {
       function: {
         name: t.name,
         description: t.description,
-        strict: t.strict || false,
+        ...(useStrict ? { strict: true } : {}),
         parameters: t.parameters,
       },
     })

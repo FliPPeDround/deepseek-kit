@@ -1,26 +1,14 @@
 import type { ChatCompletion, ChatCompletionChunk, InvokeParams, ModelOptions } from './types'
-import type { Tool } from '@/tool'
 import { omitBy } from 'es-toolkit'
 import { getChatEndpoint } from '@/client/endpoints'
 import { apiRequest } from '@/client/request'
 import { withRetry } from '@/client/retry'
 import { apiStreamRequest } from '@/client/stream-request'
-import { buildToolParameters } from '@/tool'
-
-function requiresBetaEndpoint(tools: Tool[]) {
-  return tools.some(tool => tool.strict)
-}
-
-function buildBaseUrl(config: ModelOptions, needsBeta: boolean): string {
-  const base = config.baseURL!
-  if (!needsBeta)
-    return base
-  return base.endsWith('/') ? `${base}beta` : `${base}/beta`
-}
+import { buildToolParameters, validateToolConsistency } from '@/tool'
 
 function buildRequestBody(config: ModelOptions, params: InvokeParams) {
   const { messages, response_format, tools = [] } = params
-  const { toolParameters, toolChoice } = buildToolParameters(tools)
+  const { toolParameters, toolChoice } = buildToolParameters(tools, config.strict)
 
   const thinking = config.thinking
     ? omitBy({
@@ -47,9 +35,12 @@ function buildRequestBody(config: ModelOptions, params: InvokeParams) {
 }
 
 export async function invoke(config: ModelOptions, params: InvokeParams): Promise<ChatCompletion> {
+  const tools = params.tools ?? []
+  if (!config.strict) {
+    validateToolConsistency(tools)
+  }
   const body = buildRequestBody(config, params)
-  const needsBeta = requiresBetaEndpoint(params.tools ?? [])
-  const url = getChatEndpoint(buildBaseUrl(config, needsBeta))
+  const url = getChatEndpoint(config.baseURL!)
   const maxRetries = config.maxRetries ?? 3
   const timeout = config.timeout ?? 60000
   return withRetry(
@@ -59,9 +50,12 @@ export async function invoke(config: ModelOptions, params: InvokeParams): Promis
 }
 
 export async function* invokeStream(config: ModelOptions, params: InvokeParams): AsyncGenerator<ChatCompletionChunk> {
+  const tools = params.tools ?? []
+  if (!config.strict) {
+    validateToolConsistency(tools)
+  }
   const body = { ...buildRequestBody(config, params), stream_options: config.streamOptions }
-  const needsBeta = requiresBetaEndpoint(params.tools ?? [])
-  const url = getChatEndpoint(buildBaseUrl(config, needsBeta))
+  const url = getChatEndpoint(config.baseURL!)
   const timeout = config.timeout ?? 60000
   yield* apiStreamRequest(url, config.apiKey!, body, timeout, params.signal)
 }
