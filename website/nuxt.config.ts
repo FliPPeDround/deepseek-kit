@@ -2,6 +2,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n'],
   extends: ['shadcn-docs-nuxt'],
+  // site: {
+  //   url: 'https://deepseek-kit.vercel.com',
+  // },
 
   i18n: {
     defaultLocale: 'en',
@@ -19,10 +22,13 @@ export default defineNuxtConfig({
     ],
   },
   compatibilityDate: '2024-07-06',
-  ogImage: {
-    zeroRuntime: true,
+  vite: {
+    build: {
+      sourcemap: false,
+    },
   },
   nitro: {
+    sourceMap: false,
     prerender: {
       failOnError: false,
     },
