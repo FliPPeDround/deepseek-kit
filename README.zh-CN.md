@@ -10,7 +10,7 @@
 
 DeepSeek 原生级适配的轻量 Agent 框架——思考模式精准工具调用 · 可靠结构化输出 · 极致缓存命中。
 
-**[English](./README.md)** · **[文档](https://deepseek-kit.netlify.app/zh)**
+**[English](./README.md)** · **[文档](https://deepseek-kit.vercel.app/zh)**
 
 ---
 
@@ -105,7 +105,7 @@ console.log(result.text)
 
 > **要求**：Node.js >= 18.0.0，DeepSeek API 密钥
 
-📖 完整指南请访问[文档](https://deepseek-kit.netlify.app/zh)。
+📖 完整指南请访问[文档](https://deepseek-kit.vercel.app/zh-CN)。
 
 ---
 
