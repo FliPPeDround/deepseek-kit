@@ -2,6 +2,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n'],
   extends: ['shadcn-docs-nuxt'],
+  site: {
+    url: 'https://deepseek-kit.vercel.app',
+  },
 
   i18n: {
     defaultLocale: 'en',
