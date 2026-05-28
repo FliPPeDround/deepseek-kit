@@ -12,3 +12,4 @@ temp
 .env
 .trae
 blog/
+.agents/
