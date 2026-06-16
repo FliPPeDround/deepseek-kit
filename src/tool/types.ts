@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { Model } from '@/model/types'
+import type { Model, ResolvedModelOptions, Usage } from '@/model/types'
 
 export type ToolResult = unknown
 
@@ -24,13 +24,20 @@ export interface ToolCompactConfig {
   model?: Model
 }
 
+export interface ToolExecuteContext {
+  modelConfig?: ResolvedModelOptions
+  signal?: AbortSignal
+  /** Report additional token usage from tool execution (e.g. web search API calls) */
+  addUsage?: (usage: Usage) => void
+}
+
 export interface StrictToolDefinition<T extends z.ZodObject> {
   name: string
   description: string
   strict: true
   required?: boolean
   schema: T
-  execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
+  execute: (args: z.infer<T>, context?: ToolExecuteContext) => ToolResult | Promise<ToolResult>
   timeout?: number
   retries?: number
   compact?: boolean | ToolCompactConfig
@@ -42,7 +49,7 @@ export interface NonStrictToolDefinition<T extends z.ZodObject> {
   strict?: false
   required?: boolean
   schema: T
-  execute: (args: z.infer<T>) => ToolResult | Promise<ToolResult>
+  execute: (args: z.infer<T>, context?: ToolExecuteContext) => ToolResult | Promise<ToolResult>
   timeout?: number
   retries?: number
   compact?: boolean | ToolCompactConfig
@@ -110,7 +117,7 @@ export interface StrictTool {
   required?: boolean
   schema: z.ZodObject
   parameters: Record<string, any>
-  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any) => Promise<string>
+  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any, modelConfig?: ResolvedModelOptions) => Promise<string>
   timeout?: number
   retries?: number
   compact?: boolean | ToolCompactConfig
@@ -123,10 +130,12 @@ export interface NonStrictTool {
   required?: boolean
   schema: z.ZodObject
   parameters: Record<string, any>
-  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any) => Promise<string>
+  execute: (args: string, signal?: AbortSignal, runner?: any, hooks?: any, modelConfig?: ResolvedModelOptions) => Promise<string>
   timeout?: number
   retries?: number
   compact?: boolean | ToolCompactConfig
 }
 
 export type ConsistentTools = StrictTool[] | NonStrictTool[]
+
+export type Tool = StrictTool | NonStrictTool

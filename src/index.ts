@@ -9,4 +9,6 @@ export type { BeforeStepContext, BeforeStepResult, GenerateTextHooks, GenerateTe
 export { createModel, DeepSeekModel } from './model'
 export type { Model, ModelOptions, Usage } from './model/types'
 export { tool } from './tool'
-export type { ConsistentTools, NonStrictTool, StrictTool } from './tool/types'
+export type { ConsistentTools, NonStrictTool, StrictTool, ToolExecuteContext } from './tool/types'
+export { webSearch } from './tool/web-search'
+export type { WebSearchOptions } from './tool/web-search'

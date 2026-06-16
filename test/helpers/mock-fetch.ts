@@ -85,7 +85,8 @@ export function createMockModelConfig() {
     streamOptions: { include_usage: true },
     timeout: 60000,
     maxRetries: 3,
-    userId: undefined,
+    userId: 'test-user',
+    strict: false,
   }
 }
 

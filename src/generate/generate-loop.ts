@@ -1,6 +1,6 @@
 import type z from 'zod'
 import type { GenerateTextParams, GenerateTextResult, StepInvoker, StepRef, StreamEvent } from './types'
-import type { ChatMessage, Usage } from '@/model/types'
+import type { ChatMessage, ResolvedModelOptions, Usage } from '@/model/types'
 import type { Tool } from '@/tool'
 import type { ChatCompletionTool } from '@/tool/types'
 import { AGENT_LOOP_MAX_STEPS } from '@/constants'
@@ -15,16 +15,29 @@ async function executeToolCalls(
   signal?: AbortSignal,
   runner?: HookRunner,
   hooks?: GenerateTextParams<any>['hooks'],
-): Promise<Array<{ tool_call_id: string, content: string }>> {
+  modelConfig?: ResolvedModelOptions,
+): Promise<Array<{ tool_call_id: string, content: string, usage?: Usage }>> {
   return Promise.all(
     toolCalls.map(async (toolCall) => {
       const name = toolCall.function?.name
       const tool = tools.find(t => t.name === name)
       const result = tool
-        ? await tool.execute(toolCall.function.arguments, signal, runner, hooks)
-        : `Tool execution error: Tool "${name}" not found`
+        ? await tool.execute(toolCall.function.arguments, signal, runner, hooks, modelConfig)
+        : JSON.stringify({ success: false, error: `Tool execution error: Tool "${name}" not found` })
 
-      return { tool_call_id: toolCall.id, content: result }
+      // Extract usage from tool result JSON
+      let usage: Usage | undefined
+      try {
+        const parsed = JSON.parse(result)
+        if (parsed.usage) {
+          usage = parsed.usage
+        }
+      }
+      catch {
+        // result is not JSON, no usage to extract
+      }
+
+      return { tool_call_id: toolCall.id, content: result, usage }
     }),
   )
 }
@@ -110,9 +123,13 @@ export async function* agentLoop<T extends z.ZodTypeAny>(
       currentMessages.push(stepResult.assistantMessage)
 
       if (stepResult.toolCalls.length > 0 && currentTools.length > 0) {
-        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools, signal, runner, hooks)
-        for (const { tool_call_id, content } of toolResults) {
+        const toolResults = await executeToolCalls(stepResult.toolCalls, currentTools, signal, runner, hooks, currentModel.config)
+        for (const { tool_call_id, content, usage } of toolResults) {
           currentMessages.push({ role: 'tool', content, tool_call_id })
+          // Merge tool execution usage (e.g. web search API calls) into total
+          if (usage) {
+            mergeUsage(totalUsage, usage)
+          }
         }
 
         yield { type: 'tool-call', step: stepRef.value, toolCalls: stepResult.toolCalls }

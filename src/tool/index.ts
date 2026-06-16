@@ -1,8 +1,10 @@
-import type { ConsistentTools, NonStrictTool, StrictTool, StrictToolDefinition, ToolCall, ToolChoice, ToolDefinition } from './types'
+import type { ConsistentTools, NonStrictTool, StrictTool, StrictToolDefinition, ToolCall, ToolChoice, ToolDefinition, Tool as ToolType } from './types'
 import type { HookRunner } from '@/generate/generate-utils'
 import type { GenerateTextHooks } from '@/generate/types'
+import type { ResolvedModelOptions, Usage } from '@/model/types'
 import { z } from 'zod'
 import { createCompactTool } from '@/context/compact'
+import { mergeUsage } from '@/generate/generate-utils'
 import { parseAndValidate } from '@/utils/json-parse'
 
 async function withTimeout<T>(
@@ -95,7 +97,7 @@ export function tool(config: any) {
   const { schema, execute, compact, name, description, timeout = 60000, retries = 0 } = config
   const jsonSchema = z.toJSONSchema(schema)
 
-  const wrappedExecute = async (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks): Promise<string> => {
+  const wrappedExecute = async (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks, modelConfig?: ResolvedModelOptions): Promise<string> => {
     const result = await parseAndValidate(args, schema)
 
     if (!result.success) {
@@ -107,8 +109,18 @@ export function tool(config: any) {
     }
 
     try {
+      let extraUsage: Usage | undefined
+      const addUsage = (usage: Usage) => {
+        if (extraUsage) {
+          mergeUsage(extraUsage, usage)
+        }
+        else {
+          extraUsage = { ...usage, completion_tokens_details: { reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0 } }
+        }
+      }
+
       const execResult = await withRetries(
-        async () => execute(result.data),
+        async () => execute(result.data, { modelConfig, signal, addUsage }),
         retries,
         timeout,
         signal,
@@ -130,7 +142,7 @@ export function tool(config: any) {
             })
 
             if (runner.stopped) {
-              return JSON.stringify({ success: true, data })
+              return JSON.stringify({ success: true, data, usage: extraUsage })
             }
 
             if (runner.skipped) {
@@ -156,7 +168,7 @@ export function tool(config: any) {
           // compact failure should not affect the tool result
         }
       }
-      return JSON.stringify({ success: true, data })
+      return JSON.stringify({ success: true, data, usage: extraUsage })
     }
     catch (err) {
       return JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) })
@@ -166,12 +178,13 @@ export function tool(config: any) {
   return {
     ...config,
     parameters: jsonSchema,
-    execute: (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks) => wrappedExecute(args, signal, runner, hooks),
+    execute: (args: string, signal?: AbortSignal, runner?: HookRunner, hooks?: GenerateTextHooks, modelConfig?: ResolvedModelOptions) => wrappedExecute(args, signal, runner, hooks, modelConfig),
   }
 }
 
-export type Tool = StrictTool | NonStrictTool
+export type Tool = ToolType
 export type { ConsistentTools, NonStrictTool, StrictTool }
+export { webSearch } from './web-search'
 
 export function validateToolConsistency(tools: Tool[]): void {
   const strictCount = tools.filter(t => t.strict === true).length
