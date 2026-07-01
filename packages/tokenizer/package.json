@@ -1,0 +1,53 @@
+{
+  "name": "@deepseek-kit/tokenizer",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Calculate token usage of DeepSeek model text offline (powered by Transformers.js)",
+  "author": "FliPPeDround <flippedround@qq.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/FliPPeDround/deepseek-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FliPPeDround/deepseek-kit.git",
+    "directory": "packages/tokenizer"
+  },
+  "bugs": {
+    "url": "https://github.com/FliPPeDround/deepseek-kit/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-v4",
+    "tokenizer",
+    "llm",
+    "transformers-js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "tokenizer"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "vitest",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepublishOnly": "pnpm run build",
+    "release": "bumpp"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "catalog:transformers"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:cli",
+    "typescript": "catalog:cli"
+  }
+}

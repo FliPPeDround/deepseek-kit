@@ -45,6 +45,8 @@ catalogs:
     tsdown-stale-guard: ^0.1.1
     tsnapi: ^0.3.2
     vitest: ^4.1.5
+  transformers:
+    '@huggingface/transformers': ^4.2.0
   types:
     '@types/node': ^25.6.0
   website:
